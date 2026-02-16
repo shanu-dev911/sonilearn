@@ -1,0 +1,23 @@
+
+{
+  "functions": {
+    "src/app/api/daily-mock-test/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/pyq-test/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/ncert-foundation/route.ts": {
+      "maxDuration": 180
+    },
+    "src/app/api/ai-mentor/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/custom-test/route.ts": {
+      "maxDuration": 180
+    },
+    "src/app/api/current-affairs/route.ts": {
+      "maxDuration": 180
+    }
+  }
+}

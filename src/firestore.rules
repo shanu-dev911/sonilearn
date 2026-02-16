@@ -1,0 +1,71 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    // USER DATA
+    // Users can read their own profile, but only update specific fields (handled by app logic)
+    match /users/{userId} {
+      allow read, update, delete: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+    }
+
+    // USER SUB-COLLECTIONS
+    match /users/{userId}/userExamProfile/{docId} {
+      // User can manage their own exam profile
+      allow read, write: if request.auth.uid == userId;
+    }
+    
+    match /users/{userId}/performance/{docId} {
+      // User can read their performance, write is handled by app
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    match /users/{userId}/userSubscription/{subId} {
+        // User can view their subscription status
+        allow read: if request.auth.uid == userId;
+        // Only an admin can create, update, or cancel a subscription
+        allow write: if isAdmin();
+    }
+    
+    match /users/{userId}/dailyUsage/{date} {
+        // User can read and write to their own daily usage document
+        allow read, write: if request.auth.uid == userId;
+    }
+
+    // GLOBAL COLLECTIONS
+    match /reportedQuestions/{reportId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /generatedMockTests/{testId} {
+      allow read: if request.auth != null;
+      // Write is handled by trusted server-side logic (API routes/Genkit)
+      allow write: if request.auth != null; 
+    }
+
+    match /doubts/{doubtId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // User can only update or delete their own doubts
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /pyq_questions/{questionId} {
+      allow read: if request.auth != null;
+      // Only admins can add/edit PYQs
+      allow write: if isAdmin();
+    }
+
+    // Admin roles can only be read by admins to check status, and written by other admins.
+    match /roles_admin/{uid} {
+        allow read, write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // This is a broad rule, specific rules below will take precedence.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // User Profile specific rules
+    match /users/{userId} {
+      // User can only read and write their own profile document.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Subcollections under user
+    match /users/{userId}/{collection}/{doc=**} {
+      // User can only read and write to their own subcollections.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Question Error Report rules
+    match /reportedQuestions/{reportId} {
+        // Any authenticated user can create a report, but they must be the owner.
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        
+        // Only admins can read, update, or delete reports.
+        // Assumes a /roles_admin/{uid} collection exists for admin users.
+        function isAdmin() {
+            return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        }
+        allow read, update, delete: if isAdmin();
+    }
+
+    // Cached Mock Test rules
+    match /generatedMockTests/{testId} {
+      // Any authenticated user can read a cached test.
+      allow read: if request.auth != null;
+      // Writing to the cache is handled by server-side logic (API route/Genkit Flow),
+      // which is initiated by an authenticated user.
+      allow write: if request.auth != null;
+    }
+  }
+}

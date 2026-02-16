@@ -1,0 +1,479 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the SoniLearn application.",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique identifier for the user, from Firebase Auth."
+        },
+        "displayName": {
+            "type": "string",
+            "description": "The display name of the user."
+        },
+        "mobile": {
+            "type": "string",
+            "description": "The user's 10-digit mobile number."
+        },
+        "photoURL": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the user's profile picture."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "userType": {
+          "type": "string",
+          "description": "Type of user, e.g., 'exam aspirant'."
+        }
+      },
+      "required": [
+        "uid",
+        "email"
+      ]
+    },
+    "UserSubscription": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserSubscription",
+      "type": "object",
+      "description": "Represents a user's subscription plan.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the subscription."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who owns this subscription."
+        },
+        "plan": {
+          "type": "string",
+          "description": "The name of the subscription plan ('free' or 'pro').",
+          "enum": ["free", "pro"]
+        },
+        "status": {
+            "type": "string",
+            "enum": ["active", "expired", "cancelled"],
+            "description": "The current status of the subscription."
+        },
+        "expiryDate": {
+          "type": "string",
+          "description": "The expiry date of the subscription.",
+          "format": "date-time"
+        },
+        "purchaseDate": {
+            "type": "string",
+            "description": "The date of purchase.",
+            "format": "date-time"
+        },
+        "price": {
+            "type": "number",
+            "description": "The price paid for the subscription."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "plan",
+        "status",
+        "expiryDate",
+        "purchaseDate"
+      ]
+    },
+    "DailyUsage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyUsage",
+      "description": "Tracks daily usage counts for free-tier users.",
+      "type": "object",
+      "properties": {
+        "testsTaken": { "type": "number" },
+        "doubtsAsked": { "type": "number" }
+      },
+      "required": ["testsTaken", "doubtsAsked"]
+    },
+    "Performance": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Performance",
+      "type": "object",
+      "description": "Represents a user's performance data, including overall and subject-wise stats.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the performance entity, should be same as userId."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user this performance data belongs to."
+        },
+        "overallStats": {
+          "type": "object",
+          "properties": {
+            "testsAttempted": { "type": "number" },
+            "overallAccuracy": { "type": "number" },
+            "totalQuestions": { "type": "number" },
+            "totalCorrect": { "type": "number" },
+            "bestTypingSpeed": { "type": "number", "description": "Best WPM achieved." },
+            "predictedPercentile": { "type": "number" }
+          },
+          "required": [ "testsAttempted", "overallAccuracy", "totalQuestions", "totalCorrect" ]
+        },
+        "topicWiseStats": {
+          "type": "object",
+          "description": "A map of performance metrics for each topic, keyed by 'Subject:Topic'. This is used to identify weak areas for the adaptive learning engine.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "accuracy": { "type": "number" },
+              "questionsAttempted": { "type": "number" },
+              "correct": { "type": "number" },
+              "wrong": { "type": "number" }
+            },
+            "required": [ "accuracy", "questionsAttempted", "correct", "wrong" ]
+          }
+        },
+        "performanceHistory": {
+          "type": "array",
+          "description": "History of scores from recent tests.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "testName": { "type": "string" },
+              "score": { "type": "number" },
+              "accuracy": { "type": "number" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            },
+            "required": [ "testName", "score", "accuracy", "timestamp" ]
+          }
+        }
+      },
+      "required": [ "id", "userId", "overallStats", "topicWiseStats" ]
+    },
+    "UserExamProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserExamProfile",
+      "description": "Stores user preferences for their target exam.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique identifier of the user."
+        },
+        "homeState": {
+          "type": "string",
+          "description": "The user's home state for regional content filtering."
+        },
+        "targetExamCategory": {
+          "type": "string",
+          "description": "e.g., 'Central' or 'State'"
+        },
+        "targetExamSubCategory": {
+          "type": "string",
+          "description": "e.g., 'SSC', 'JSSC'"
+        },
+        "targetExam": {
+          "type": "string",
+          "description": "e.g., 'CGL', 'MTS'"
+        },
+        "goalTrackerText": {
+          "type": "string",
+          "description": "The formatted text for the dashboard goal tracker."
+        }
+      },
+      "required": [
+        "userId",
+        "homeState",
+        "targetExamCategory",
+        "targetExamSubCategory",
+        "targetExam",
+        "goalTrackerText"
+      ]
+    },
+    "ReportedQuestion": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ReportedQuestion",
+      "description": "Stores user-submitted reports for questions with errors.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the report."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who submitted the report."
+        },
+        "questionId": {
+          "type": "string",
+          "description": "A unique identifier for the question being reported."
+        },
+        "questionText": {
+          "type": "string",
+          "description": "The full text of the question being reported."
+        },
+        "examName": {
+          "type": "string",
+          "description": "The name of the exam the question belongs to."
+        },
+        "reportType": {
+          "type": "string",
+          "description": "The type of error reported (e.g., 'Wrong Answer', 'Typo')."
+        },
+        "reportNote": {
+          "type": "string",
+          "description": "Optional additional notes from the user."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the report (e.g., 'new', 'reviewed', 'resolved')."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the report was submitted."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "questionId",
+        "questionText",
+        "examName",
+        "reportType",
+        "status",
+        "timestamp"
+      ]
+    },
+    "PyqQuestion": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PyqQuestion",
+      "description": "Represents a single Previous Year Question.",
+      "type": "object",
+      "properties": {
+        "exam": { "type": "string", "description": "e.g., SSC CGL, UP Police" },
+        "year": { "type": "number", "description": "e.g., 2023" },
+        "subject": { "type": "string", "description": "e.g., Maths, Reasoning" },
+        "question_en": { "type": "string", "description": "The question in English." },
+        "question_hi": { "type": "string", "description": "The question in Hindi." },
+        "options": { "type": "array", "items": { "type": "string" }, "description": "An array of 4 options." },
+        "answer": { "type": "string", "description": "The correct option." },
+        "solution": { "type": "string", "description": "The detailed solution." }
+      },
+      "required": ["exam", "year", "subject", "question_en", "options", "answer"]
+    },
+    "GeneratedMockTest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GeneratedMockTest",
+      "type": "object",
+      "description": "Represents a cached, AI-generated mock test.",
+      "properties": {
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "answer": { "type": "string" },
+              "explanation": { "type": "string" },
+              "subject": { "type": "string" },
+              "topic": { "type": "string" }
+            },
+            "required": ["question", "options", "answer", "explanation", "subject", "topic"]
+          }
+        }
+      },
+      "required": ["questions"]
+    },
+    "Doubt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Doubt",
+      "description": "Represents a user-posted doubt in the community hub.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the doubt." },
+        "userId": { "type": "string", "description": "The UID of the user who posted the doubt." },
+        "authorName": { "type": "string", "description": "Display name of the author." },
+        "authorPhotoURL": { "type": "string", "description": "URL of the author's profile picture." },
+        "text": { "type": "string", "description": "The content of the doubt." },
+        "imageURL": { "type": "string", "description": "Optional URL of an image attached to the doubt." },
+        "upvotes": { "type": "number", "description": "Number of upvotes." },
+        "commentCount": { "type": "number", "description": "Number of comments." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Timestamp of when the doubt was posted." }
+      },
+      "required": ["id", "userId", "authorName", "text", "upvotes", "commentCount", "timestamp"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous",
+      "google.com"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. This is the root document for all user-specific data. User ID is used as the document ID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user (from Firebase Auth)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/userSubscription/{subscriptionId}",
+        "definition": {
+          "entityName": "userSubscription",
+          "schema": {
+            "$ref": "#/backend/entities/UserSubscription"
+          },
+          "description": "Stores user subscription information. A user can have multiple subscriptions over time.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "subscriptionId",
+              "description": "The unique identifier of the subscription."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/dailyUsage/{date}",
+        "definition": {
+          "entityName": "dailyUsage",
+          "schema": {
+            "$ref": "#/backend/entities/DailyUsage"
+          },
+          "description": "Stores daily usage counts for free-tier users. The document ID is the date in YYYY-MM-DD format.",
+          "params": [
+            { "name": "userId", "description": "The unique identifier of the user." },
+            { "name": "date", "description": "The date of usage in YYYY-MM-DD format." }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/userExamProfile/{userId}",
+        "definition": {
+          "entityName": "userExamProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserExamProfile"
+          },
+          "description": "Stores the user's exam preferences. The document ID is the same as the user's UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/performance/{userId}",
+        "definition": {
+          "entityName": "performance",
+          "schema": {
+            "$ref": "#/backend/entities/Performance"
+          },
+          "description": "Stores aggregated performance data of the user. The document ID is the user's UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/reportedQuestions/{reportId}",
+        "definition": {
+          "entityName": "reportedQuestion",
+          "schema": {
+            "$ref": "#/backend/entities/ReportedQuestion"
+          },
+          "description": "Stores all error reports for questions submitted by users. The report ID is auto-generated.",
+          "params": [
+            {
+              "name": "reportId",
+              "description": "The unique identifier of the error report."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "role_admin",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection signify that the user is an admin. Existence determines admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/generatedMockTests/{testId}",
+        "definition": {
+          "entityName": "generatedMockTest",
+          "schema": {
+            "$ref": "#/backend/entities/GeneratedMockTest"
+          },
+          "description": "Stores cached AI-generated mock tests to reduce redundant AI calls. The document ID is a hash of the test parameters.",
+          "params": [
+            {
+              "name": "testId",
+              "description": "The unique cache key for the test."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/doubts/{doubtId}",
+        "definition": {
+          "entityName": "doubt",
+          "schema": {
+            "$ref": "#/backend/entities/Doubt"
+          },
+          "description": "Stores all community doubts. Openly readable by authenticated users.",
+          "params": [
+            { "name": "doubtId", "description": "The unique identifier of the doubt." }
+          ]
+        }
+      },
+      {
+        "path": "/pyq_questions/{questionId}",
+        "definition": {
+          "entityName": "pyqQuestion",
+          "schema": { "$ref": "#/backend/entities/PyqQuestion" },
+          "description": "Stores individual Previous Year Questions for the PYQ Bank feature.",
+          "params": [
+            { "name": "questionId", "description": "Auto-generated unique ID for the question." }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to ensure security, scalability, and ease of debugging. User-specific data is nested under `/users/{userId}` to enforce ownership-based security rules easily. Global data like `reportedQuestions`, and `doubts` are in top-level collections for broader access. Admin roles are managed in a separate `roles_admin` collection for clear privilege separation. The `performance` document is now the single source of truth for a user's progress. The new `userSubscription` and `dailyUsage` subcollections are added under each user to manage the freemium model securely."
+  }
+}

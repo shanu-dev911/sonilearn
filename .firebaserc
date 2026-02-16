@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "studio-6456282080-b0a0a"
+  },
+  "targets": {
+    "studio-6456282080-b0a0a": {
+      "hosting": {
+        "main": [
+          "studio-6456282080-b0a0a"
+        ],
+        "sonilearn": [
+          "sonilearn-97988"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
