@@ -25,12 +25,14 @@ import {
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
+import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, HelpCircle } from "lucide-react";
 
 interface Question {
   id: string;
   question: string;
   options: string[];
   answer: string;
+  examName?: string; // Target track verification identifier
 }
 
 type Phase =
@@ -40,59 +42,27 @@ type Phase =
   | "result";
 
 // =========================
-// SETTINGS
+// PREMIUM METRIC CONFIGURATIONS
 // =========================
-
-const TOTAL_QUESTIONS = 20;
-
-const TIMER_SECONDS = 25 * 60;
-
-// =========================
-// TIMER FORMAT
-// =========================
+const TOTAL_QUESTIONS = 30; // 🎯 30 Questions Locked
+const TIMER_SECONDS = 10 * 60; // ⏱️ 10 Minutes Calibration
 
 function formatTime(sec: number) {
-
   const m = Math.floor(sec / 60);
-
   const s = sec % 60;
-
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-
 }
 
-// =========================
-// PAGE
-// =========================
-
 export default function DailyChallengePage() {
-
-  const [phase, setPhase] =
-    useState<Phase>("loading");
-
-  const [questions, setQuestions] =
-    useState<Question[]>([]);
-
-  const [answers, setAnswers] =
-    useState<string[]>([]);
-
-  const [current, setCurrent] =
-    useState(0);
-
-  const [timeLeft, setTimeLeft] =
-    useState(TIMER_SECONDS);
-
-  const [score, setScore] =
-    useState(0);
-
-  const [error, setError] =
-    useState("");
-
-  const [targetExam, setTargetExam] =
-    useState("");
-
-  const [user, authLoading, authError] =
-    useAuthState(auth);
+  const [phase, setPhase] = useState<Phase>("loading");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [current, setCurrent] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
+  const [score, setScore] = useState(0);
+  const [error, setError] = useState("");
+  const [targetExam, setTargetExam] = useState("");
+  const [user, authLoading, authError] = useAuthState(auth);
 
   const normalizeTargetExam = (exam: string) => {
     const cleaned = exam.trim();
@@ -107,24 +77,31 @@ export default function DailyChallengePage() {
     );
   };
 
-  const timerRef =
-    useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // =========================
-  // LOAD QUESTIONS
-  // =========================
+  // Hook state tracking placement rule executed
+  const q = useMemo(() => {
+    return (
+      questions[current] || {
+        question: "",
+        options: [],
+        examName: targetExam
+      }
+    );
+  }, [questions, current, targetExam]);
 
+  // LOAD USER META DATA
   useEffect(() => {
     if (authLoading) return;
 
     if (authError) {
-      setError("Authentication failed.");
+      setError("Authentication layer missing verification sync.");
       setPhase("result");
       return;
     }
 
     if (!user) {
-      setError("Please log in to access the Daily Challenge.");
+      setError("Active operational token required. Please log in.");
       setPhase("result");
       return;
     }
@@ -135,7 +112,7 @@ export default function DailyChallengePage() {
       userRef,
       (snap) => {
         if (!snap.exists()) {
-          setError("User profile not found.");
+          setError("User schematic properties missing from database.");
           setPhase("result");
           return;
         }
@@ -143,9 +120,7 @@ export default function DailyChallengePage() {
         const exam = snap.data()?.targetExam?.trim();
 
         if (!exam) {
-          setError(
-            "Please select your target exam in your profile."
-          );
+          setError("Configuration error: No target track set on profile routing module.");
           setPhase("result");
           return;
         }
@@ -154,7 +129,7 @@ export default function DailyChallengePage() {
       },
       (err) => {
         console.error(err);
-        setError("Unable to load the user target exam.");
+        setError("Telemetry connection failure during profile resolution.");
         setPhase("result");
       }
     );
@@ -162,6 +137,7 @@ export default function DailyChallengePage() {
     return () => unsubscribe();
   }, [user, authLoading, authError]);
 
+  // ENGINE RESOLUTION: QUESTIONS RETRIEVAL LAYER
   useEffect(() => {
     if (!targetExam) return;
 
@@ -176,11 +152,12 @@ export default function DailyChallengePage() {
 
         const examFilters = normalizeTargetExam(targetExam);
 
+        // Mix dataset optimization retrieval logic
         const snap = await getDocs(
           query(
             collection(db, "questions"),
             where("exam", "in", examFilters),
-            limit(TOTAL_QUESTIONS)
+            limit(100) // Excess metrics requested for optimization layout shuffling
           )
         );
 
@@ -188,13 +165,14 @@ export default function DailyChallengePage() {
 
         snap.forEach((d) => {
           const data: any = d.data();
-          const answerKey =
-            data.answer?.toString().toUpperCase();
-          const answerValue =
-            data["option" + answerKey] || "";
+          const answerKey = data.answer?.toString().toUpperCase();
+          const answerValue = data["option" + answerKey] || "";
+
+          // Bi-lingual language variables safe string deployment
+          const primaryText = data.questionEn || data.question || "";
 
           if (
-            data.questionEn &&
+            primaryText &&
             data.optionA &&
             data.optionB &&
             data.optionC &&
@@ -203,26 +181,21 @@ export default function DailyChallengePage() {
           ) {
             arr.push({
               id: d.id,
-              question: data.questionEn,
-              options: [
-                data.optionA,
-                data.optionB,
-                data.optionC,
-                data.optionD,
-              ],
+              question: primaryText,
+              options: [data.optionA, data.optionB, data.optionC, data.optionD],
               answer: answerValue,
+              examName: data.exam || targetExam
             });
           }
         });
 
+        // Maximum random dispersion deployment architecture rule
         arr = arr
           .sort(() => Math.random() - 0.5)
           .slice(0, TOTAL_QUESTIONS);
 
         if (arr.length === 0) {
-          setError(
-            `No questions found for ${targetExam}.`
-          );
+          setError(`No target evaluation entries resolved for profile metadata: ${targetExam}.`);
           setPhase("result");
           return;
         }
@@ -232,7 +205,7 @@ export default function DailyChallengePage() {
         setPhase("quiz");
       } catch (err) {
         console.error(err);
-        setError("Questions failed to load.");
+        setError("Critical framework exception parsing standard database vectors.");
         setPhase("result");
       }
     }
@@ -240,598 +213,294 @@ export default function DailyChallengePage() {
     loadQuestions();
   }, [targetExam]);
 
-  // =========================
-  // TIMER
-  // =========================
-
+  // MASTER TIMER REGULATION CONTROLLER
   useEffect(() => {
+    if (phase !== "quiz") return;
 
-    if (phase !== "quiz")
-      return;
-
-    timerRef.current =
-      setInterval(() => {
-
-        setTimeLeft((prev) => {
-
-          if (prev <= 1) {
-
-            clearInterval(
-              timerRef.current!
-            );
-
-            finishTest();
-
-            return 0;
-
-          }
-
-          return prev - 1;
-
-        });
-
-      }, 1000);
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          finishTest();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
-
-      if (timerRef.current) {
-
-        clearInterval(
-          timerRef.current
-        );
-
-      }
-
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-
   }, [phase]);
 
-  // =========================
-  // SELECT ANSWER
-  // =========================
-
-  const selectAnswer = (
-    option: string
-  ) => {
-
-    const updated = [
-      ...answers,
-    ];
-
+  const selectAnswer = (option: string) => {
+    const updated = [...answers];
     updated[current] = option;
-
     setAnswers(updated);
-
   };
-
-  // =========================
-  // NEXT QUESTION
-  // =========================
 
   const nextQuestion = () => {
-
-    if (!answers[current])
-      return;
-
-    if (
-      current <
-      questions.length - 1
-    ) {
-
+    if (current < questions.length - 1) {
       setCurrent(current + 1);
-
     } else {
-
       finishTest();
-
     }
-
   };
 
-  // =========================
-  // FINISH TEST
-  // =========================
+  // FINAL METRIC COMMIT OPERATION
+  const finishTest = async () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setPhase("submitting");
 
-  const finishTest =
-    async () => {
+    let finalScore = 0;
+    questions.forEach((q, i) => {
+      if (answers[i] === q.answer) finalScore++;
+    });
 
-      if (timerRef.current) {
+    setScore(finalScore);
 
-        clearInterval(
-          timerRef.current
-        );
+    try {
+      const activeUser = auth.currentUser;
+      await addDoc(collection(db, "exam_results"), {
+        userId: activeUser?.uid || "guest",
+        userName: activeUser?.displayName || activeUser?.email || "Student",
+        score: finalScore,
+        total: questions.length,
+        examTrack: targetExam,
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.log("Database submission block error:", err);
+    }
 
-      }
+    setPhase("result");
+  };
 
-      setPhase("submitting");
-
-      let finalScore = 0;
-
-      questions.forEach(
-        (q, i) => {
-
-          if (
-            answers[i] === q.answer
-          ) {
-
-            finalScore++;
-
-          }
-
-        }
-      );
-
-      setScore(finalScore);
-
-      try {
-
-        const user =
-          auth.currentUser;
-
-        await addDoc(
-          collection(
-            db,
-            "exam_results"
-          ),
-          {
-
-            userId:
-              user?.uid ||
-              "guest",
-
-            userName:
-              user?.displayName ||
-              user?.email ||
-              "Student",
-
-            score: finalScore,
-
-            total:
-              questions.length,
-
-            createdAt:
-              serverTimestamp(),
-
-          }
-        );
-
-      } catch (err) {
-
-        console.log(err);
-
-      }
-
-      setPhase("result");
-
-    };
-
-  // =========================
-  // LOADING
-  // =========================
-
+  // UI LOADER STATE DESIGN
   if (phase === "loading") {
-
     return (
-
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100">
-
-        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-
-        <p className="mt-6 text-lg font-bold text-gray-500">
-
-          Loading Daily Challenge...
-
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Calibrating 30 Challenge Nodes...
         </p>
-
       </div>
-
     );
-
   }
 
-  // =========================
-  // SUBMITTING
-  // =========================
-
-  if (
-    phase === "submitting"
-  ) {
-
+  // UI COMMITMENT TRANSACTION STATE DESIGN
+  if (phase === "submitting") {
     return (
-
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100">
-
-        <div className="w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-
-        <p className="mt-6 text-lg font-bold text-gray-500">
-
-          Saving Result...
-
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Securing metric score logs...
         </p>
-
       </div>
-
     );
-
   }
 
-  // =========================
-  // RESULT
-  // =========================
-
+  // PLATFORM RESULTS INTERFACE LAYOUT
   if (phase === "result") {
-
     if (error) {
-
       return (
-
-        <div className="min-h-screen flex items-center justify-center bg-white">
-
-          <p className="text-red-500 font-bold text-xl">
-
-            {error}
-
-          </p>
-
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+          <div className="max-w-md w-full bg-white border border-slate-200 p-6 rounded-2xl shadow-sm text-center">
+            <p className="text-red-500 font-bold text-sm tracking-tight">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+            >
+              Retry Pipeline Alignment
+            </button>
+          </div>
         </div>
-
       );
-
     }
 
     return (
-
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
-
-        <div className="bg-white rounded-[2rem] p-10 w-full max-w-xl shadow-2xl text-center">
-
-          <div className="text-7xl mb-6">
-            🎯
+      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4 antialiased">
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-8 w-full max-w-lg shadow-xl shadow-slate-200/40 text-center">
+          <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-5 shadow-sm">
+            🏆
           </div>
-
-          <h1 className="text-4xl font-black text-gray-800">
-
-            Daily Challenge Completed
-
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+            Assessment Concluded
           </h1>
-
-          <p className="text-gray-500 mt-3 text-lg">
-
-            You completed today's challenge 🚀
-
+          <p className="text-slate-400 mt-1 text-xs font-medium">
+            Daily performance index for <span className="font-bold text-slate-700">{targetExam}</span> recorded.
           </p>
 
-          <div className="bg-blue-50 rounded-3xl p-8 mt-8">
-
-            <p className="text-gray-500 text-lg">
-
-              Your Score
-
-            </p>
-
-            <h2 className="text-7xl font-black text-blue-600 mt-3">
-
-              {score}
-
-            </h2>
-
-            <p className="text-gray-400 mt-2 text-lg">
-
-              out of {questions.length}
-
-            </p>
-
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mt-6 flex items-center justify-between">
+            <div className="text-left">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Evaluation Output</span>
+              <span className="text-sm font-semibold text-slate-500 mt-1 block">Accurate Submissions</span>
+            </div>
+            <div className="text-right">
+              <h2 className="text-4xl font-black text-blue-600 tracking-tight">
+                {score} <span className="text-slate-400 text-xs font-bold">/ {questions.length}</span>
+              </h2>
+            </div>
           </div>
 
           <button
-            onClick={() =>
-            (window.location.href =
-              "/leaderboard")
-            }
-            className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-lg transition-colors shadow-lg"
+            onClick={() => (window.location.href = "/leaderboard")}
+            className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-xs shadow-md transition-all uppercase tracking-wider"
           >
-
-            🏆 View Leaderboard
-
+            Review National Placement Grid
           </button>
-
         </div>
-
       </div>
-
     );
-
   }
 
-  // =========================
-  // CURRENT QUESTION
-  // =========================
-
-  const q = useMemo(() => {
-
-    return (
-      questions[current] || {
-        question: "",
-        options: [],
-      }
-    );
-
-  }, [questions, current]);
-  // =========================
-  // MAIN UI
-  // =========================
-
+  // SYSTEM TEST ENVIRONMENT INTERFACE LAYOUT
   return (
+    <div className="min-h-screen bg-slate-50/50 pb-32 antialiased text-slate-900 selection:bg-blue-600 selection:text-white">
 
-    <div className="min-h-screen bg-slate-50 pb-32 antialiased text-gray-800">
-
-      {/* HEADER */}
-
-      <header className="bg-white border-b sticky top-0 z-50 shadow-sm">
-
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-
+      {/* BRAND INTERFACE APP BAR */}
+      <header className="bg-white border-b border-slate-200/80 sticky top-0确定 z-50 backdrop-blur-md">
+        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div>
-
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
-
-              SONILEARN
-
-            </p>
-
-            <h1 className="text-2xl font-black text-gray-900 mt-1">
-
-              🔥 Daily Challenge
-
-            </h1>
-
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+              SoniLearn Core Engine
+            </span>
+            {/* 🎯 USER TRACK IDENTIFIER: Dynamic verification badge */}
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
+                Challenge: {targetExam}
+              </h1>
+            </div>
           </div>
 
-          <div className="bg-red-50 text-red-600 px-5 py-2 rounded-2xl font-black text-xl">
-
-            {formatTime(timeLeft)}
-
+          <div className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-xl font-black text-lg tracking-tight flex items-center gap-2 shadow-sm">
+            <Timer size={16} className="animate-pulse" />
+            <span>{formatTime(timeLeft)}</span>
           </div>
-
         </div>
 
+        {/* LINEAR HORIZONTAL PROGRESS TRACK */}
+        <div className="h-1 w-full bg-slate-100 relative">
+          <div
+            className="h-full bg-blue-600 transition-all duration-300 rounded-r"
+            style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+          />
+        </div>
       </header>
 
-      {/* PROGRESS */}
+      <main className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
 
-      <div className="h-2 bg-gray-200 sticky top-[72px] z-40">
-
-        <div
-          className="h-full bg-blue-600 transition-all"
-          style={{
-            width:
-              `${((current + 1) /
-                questions.length) *
-              100}%`,
-          }}
-        />
-
-      </div>
-
-      {/* MAIN */}
-
-      <main className="max-w-xl mx-auto px-4 mt-6 space-y-6">
-
-        {/* QUESTION CARD */}
-
-        <div className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm">
-
-          <div className="flex items-center justify-between mb-6">
-
+        {/* ITEM SELECTION PIPELINE CARD */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
             <div>
-
-              <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-
-                Question {current + 1} / {questions.length}
-
-              </p>
-
-              <p className="mt-1 text-sm text-slate-500 font-semibold">
-
-                Practice Mode
-
-              </p>
-
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                Matrix Node {current + 1} of {questions.length}
+              </span>
+              {/* 🎯 CURRENT ITEM EXAM BADGE: Informs user which exam question belongs to */}
+              <span className="inline-block mt-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-md text-[10px] font-black px-2 py-0.5 uppercase tracking-wide">
+                Target: {q.examName || targetExam} Verification
+              </span>
             </div>
-
-            <div className="bg-blue-50 px-4 py-2 rounded-full text-sm font-bold text-blue-700">
-
-              {answers.filter(Boolean).length} Answered
-
+            <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+              <CheckCircle size={12} className="text-blue-500" />
+              <span>{answers.filter(Boolean).length} Synced</span>
             </div>
-
           </div>
 
-          {/* QUESTION */}
-
-          <h2 className="text-2xl font-black leading-relaxed text-gray-900 mb-8">
-
+          {/* DYNAMIC TEXT BOX: Bi-lingual scalability setup */}
+          <h2 className="text-xl font-black leading-relaxed text-slate-900 mb-6 tracking-tight">
             {q.question}
-
           </h2>
 
-          {/* OPTIONS */}
-
-          <div className="space-y-4">
-
-            {q.options.map(
-              (
-                opt: string,
-                i: number
-              ) => {
-
-                const isSelected =
-                  answers[current] === opt;
-
-                return (
-
-                  <button
-                    key={i}
-                    onClick={() =>
-                      selectAnswer(opt)
-                    }
-                    className={`
-                      w-full
-                      text-left
-                      rounded-2xl
-                      border-2
-                      p-5
-                      transition-all
-                      flex
-                      gap-4
-
-                      ${isSelected
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-200 hover:border-blue-300 bg-white"
-                      }
-                    `}
+          {/* OPTIONS SELECTION WRAPPER */}
+          <div className="space-y-3">
+            {q.options.map((opt: string, i: number) => {
+              const isSelected = answers[current] === opt;
+              return (
+                <button
+                  key={i}
+                  onClick={() => selectAnswer(opt)}
+                  className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${isSelected
+                      ? "border-blue-600 bg-blue-50/60 shadow-sm shadow-blue-600/5 text-blue-900"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
+                    }`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isSelected
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                      }`}
                   >
-
-                    <div
-                      className={`
-                        w-11 h-11 rounded-full flex items-center justify-center font-black flex-shrink-0
-
-                        ${isSelected
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-600"
-                        }
-                      `}
-                    >
-
-                      {String.fromCharCode(
-                        65 + i
-                      )}
-
-                    </div>
-
-                    <div className="text-lg font-semibold leading-relaxed">
-
-                      {opt}
-
-                    </div>
-
-                  </button>
-
-                );
-
-              }
-            )}
-
+                    {String.fromCharCode(65 + i)}
+                  </div>
+                  <div className="text-sm font-semibold leading-relaxed break-words flex-1">
+                    {opt}
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          {/* ACTIONS */}
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-
+          {/* INTERACTIVE CONTROLS BOUNDARY */}
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-3">
             {current > 0 && (
-
               <button
-                onClick={() =>
-                  setCurrent(current - 1)
-                }
-                className="sm:w-auto w-full px-6 py-4 rounded-2xl bg-slate-100 font-bold hover:bg-slate-200 transition"
+                onClick={() => setCurrent(current - 1)}
+                className="inline-flex items-center gap-1 px-4 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all border border-slate-200/40"
               >
-
-                ← Back
-
+                <ArrowLeft size={14} /> Back
               </button>
-
             )}
-
             <button
               onClick={nextQuestion}
               disabled={!answers[current]}
-              className={`
-                w-full
-                py-4
-                rounded-2xl
-                font-black
-                text-lg
-                transition-all
-
-                ${answers[current]
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }
-              `}
+              className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${answers[current]
+                  ? "bg-slate-900 hover:bg-slate-800 text-white"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                }`}
             >
-
-              {current ===
-                questions.length - 1
-                ? "✓ Finish Test"
-                : "Next Question →"}
-
+              {current === questions.length - 1 ? (
+                <>
+                  <Flag size={13} /> Complete Calibration
+                </>
+              ) : (
+                <>
+                  Advance Segment <ArrowRight size={13} />
+                </>
+              )}
             </button>
-
           </div>
-
         </div>
 
-        {/* QUESTION PALETTE */}
-
-        <div className="bg-white rounded-[2rem] border border-slate-200 p-5 shadow-sm">
-
-          <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
-
-            Question Palette
-
-          </p>
-
-          <div className="grid grid-cols-5 sm:grid-cols-10 gap-3">
-
-            {questions.map(
-              (_, i) => {
-
-                const isCurrent =
-                  i === current;
-
-                const isAnswered =
-                  !!answers[i];
-
-                return (
-
-                  <button
-                    key={i}
-                    onClick={() =>
-                      setCurrent(i)
-                    }
-                    className={`
-                      h-12
-                      rounded-xl
-                      font-bold
-                      text-sm
-                      transition-all
-
-                      ${isCurrent
-                        ? "bg-blue-600 text-white ring-4 ring-blue-100"
-                        : isAnswered
-                          ? "bg-blue-50 text-blue-600 border border-blue-200"
-                          : "bg-gray-50 text-gray-400 border border-gray-100"
-                      }
-                    `}
-                  >
-
-                    {i + 1}
-
-                  </button>
-
-                );
-
-              }
-            )}
-
+        {/* COMPREHENSIVE SEGMENT INTERACTIVE PALETTE */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-3.5">
+            Deployment Matrix Map
+          </span>
+          <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
+            {questions.map((_, i) => {
+              const isCurrent = i === current;
+              const isAnswered = !!answers[i];
+              return (
+                <button
+                  key={i}
+                  onClick={() => setCurrent(i)}
+                  className={`h-9 rounded-lg font-bold text-xs transition-all border ${isCurrent
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                      : isAnswered
+                        ? "bg-blue-50 border-blue-200 text-blue-600 font-black"
+                        : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
+                    }`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
           </div>
-
         </div>
-
       </main>
-
     </div>
-
   );
-
 }
