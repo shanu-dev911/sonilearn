@@ -1,22 +1,12 @@
-import type { Metadata } from "next";
+import { FirebaseProvider } from '@/context/FirebaseContext'; // Correct context path
 
-import "./globals.css";
-export const metadata: Metadata = {
-  title: "SoniLearn",
-  description: "SSC & Railway Preparation Platform",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="antialiased bg-slate-50 text-gray-900">
-        <main className="min-h-screen">
+      <body>
+        <FirebaseProvider>
           {children}
-        </main>
+        </FirebaseProvider>
       </body>
     </html>
   );
