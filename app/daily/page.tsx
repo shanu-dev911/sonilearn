@@ -22,6 +22,7 @@ import {
   serverTimestamp,
   where,
   limit,
+  writeBatch,
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -30,9 +31,14 @@ import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, HelpCircle } from "luc
 interface Question {
   id: string;
   question: string;
+  questionEn?: string;
+  questionHi?: string;
   options: string[];
+  optionsEn?: string[];
+  optionsHi?: string[];
   answer: string;
   examName?: string; // Target track verification identifier
+  topic?: string;
 }
 
 type Phase =
@@ -83,9 +89,18 @@ export default function DailyChallengePage() {
   const q = useMemo(() => {
     return (
       questions[current] || {
+        id: "",
         question: "",
+        questionEn: "",
+        questionHi: "",
         options: [],
-        examName: targetExam
+        optionsEn: [],
+        optionsHi: [],
+        answer: "",
+        explanationEn: "",
+        explanationHi: "",
+        examName: targetExam,
+        topic: ""
       }
     );
   }, [questions, current, targetExam]);
@@ -179,12 +194,25 @@ export default function DailyChallengePage() {
             data.optionD &&
             answerValue
           ) {
+            const optionsEn = [data.optionA || "", data.optionB || "", data.optionC || "", data.optionD || ""];
+            const optionsHi = [
+              data.optionAHi || data.optionA || "",
+              data.optionBHi || data.optionB || "",
+              data.optionCHi || data.optionC || "",
+              data.optionDHi || data.optionD || "",
+            ];
+
             arr.push({
               id: d.id,
               question: primaryText,
-              options: [data.optionA, data.optionB, data.optionC, data.optionD],
+              questionEn: primaryText,
+              questionHi: data.questionHi || data.questionHindi || "",
+              options: optionsEn,
+              optionsEn,
+              optionsHi,
               answer: answerValue,
-              examName: data.exam || targetExam
+              examName: data.exam || targetExam,
+              topic: data.subject || data.topic || targetExam,
             });
           }
         });
@@ -259,16 +287,47 @@ export default function DailyChallengePage() {
 
     setScore(finalScore);
 
+    const activeUserId = user?.uid || auth.currentUser?.uid || "guest";
+
     try {
-      const activeUser = auth.currentUser;
       await addDoc(collection(db, "exam_results"), {
-        userId: activeUser?.uid || "guest",
-        userName: activeUser?.displayName || activeUser?.email || "Student",
+        userId: activeUserId,
+        userName: user?.displayName || user?.email || "Student",
         score: finalScore,
         total: questions.length,
         examTrack: targetExam,
         createdAt: serverTimestamp(),
       });
+
+      const weakQuestionsToLog = questions.flatMap((q, i) => {
+        const selectedAnswer = (answers[i] || "").trim();
+
+        if (selectedAnswer === q.answer) {
+          return [];
+        }
+
+        return [{
+          userId: activeUserId,
+          questionEn: q.questionEn || q.question || "",
+          questionHi: q.questionHi || "",
+          optionsEn: q.optionsEn || q.options || [],
+          optionsHi: q.optionsHi || q.options || [],
+          correctAnswer: q.answer,
+          topic: q.topic || targetExam,
+          timestamp: serverTimestamp(),
+        }];
+      });
+
+      if (weakQuestionsToLog.length > 0) {
+        const batch = writeBatch(db);
+
+        weakQuestionsToLog.forEach((entry) => {
+          const ref = doc(collection(db, "weak_questions"));
+          batch.set(ref, entry);
+        });
+
+        await batch.commit();
+      }
     } catch (err) {
       console.log("Database submission block error:", err);
     }
@@ -409,34 +468,54 @@ export default function DailyChallengePage() {
             </div>
           </div>
 
-          {/* DYNAMIC TEXT BOX: Bi-lingual scalability setup */}
-          <h2 className="text-xl font-black leading-relaxed text-slate-900 mb-6 tracking-tight">
-            {q.question}
-          </h2>
+          {/* BILINGUAL QUESTION SECTION */}
+          <div className="mb-6">
+            <h2 className="text-xl font-black leading-relaxed text-slate-900 tracking-tight mb-4">
+              {q.questionEn || q.question}
+            </h2>
+            {q.questionHi && (
+              <>
+                <div className="border-t border-slate-200 my-4"></div>
+                <h2 className="text-xl font-bold leading-relaxed text-slate-700 tracking-tight font-hindi">
+                  {q.questionHi}
+                </h2>
+              </>
+            )}
+          </div>
 
-          {/* OPTIONS SELECTION WRAPPER */}
+          {/* BILINGUAL OPTIONS SELECTION WRAPPER */}
           <div className="space-y-3">
-            {q.options.map((opt: string, i: number) => {
-              const isSelected = answers[current] === opt;
+            {q.optionsEn.map((optEn: string, i: number) => {
+              const optHi = q.optionsHi?.[i] || "";
+              const isSelected = answers[current] === optEn;
               return (
                 <button
                   key={i}
-                  onClick={() => selectAnswer(opt)}
-                  className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${isSelected
+                  onClick={() => selectAnswer(optEn)}
+                  className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${
+                    isSelected
                       ? "border-blue-600 bg-blue-50/60 shadow-sm shadow-blue-600/5 text-blue-900"
                       : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
-                    }`}
+                  }`}
                 >
                   <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isSelected
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${
+                      isSelected
                         ? "bg-blue-600 text-white"
                         : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                      }`}
+                    }`}
                   >
                     {String.fromCharCode(65 + i)}
                   </div>
-                  <div className="text-sm font-semibold leading-relaxed break-words flex-1">
-                    {opt}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold leading-relaxed break-words">
+                      {optEn}
+                    </div>
+                    {optHi && (
+                      <div className="text-xs font-medium text-slate-600 mt-1 font-hindi break-words">
+                        {optHi}
+                      </div>
+                    )}
                   </div>
                 </button>
               );
@@ -467,7 +546,7 @@ export default function DailyChallengePage() {
                 </>
               ) : (
                 <>
-                  Advance Segment <ArrowRight size={13} />
+                  Next <ArrowRight size={13} />
                 </>
               )}
             </button>

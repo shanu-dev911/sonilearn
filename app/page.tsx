@@ -243,7 +243,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="bg-slate-950 text-white group-hover:bg-blue-600 px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all whitespace-nowrap self-end md:self-auto flex items-center gap-1.5">
-            Initialize Module <ArrowUpRight size={14} />
+            Start <ArrowUpRight size={14} />
           </div>
         </button>
 

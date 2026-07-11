@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -211,7 +212,7 @@ export default function LeaderboardPage() {
                     <div
                         className={`rounded-[2rem] p-5 shadow-xl text-white flex items-center justify-between gap-4
 
-            ${userRank.score >= cutoff
+            ${userRank.score >= cutoff
                                 ? "bg-gradient-to-r from-green-600 to-emerald-700"
                                 : "bg-gradient-to-r from-blue-600 to-indigo-700"
                             }`}
@@ -252,7 +253,7 @@ export default function LeaderboardPage() {
                             <div
                                 className={`mt-2 px-3 py-1 rounded-full text-[10px] font-black
 
-                ${userRank.score >= cutoff
+                ${userRank.score >= cutoff
                                         ? "bg-white/20"
                                         : "bg-red-500/30"
                                     }`}
@@ -369,7 +370,7 @@ export default function LeaderboardPage() {
                                 key={u.id}
                                 className={`rounded-[1.5rem] p-4 border shadow-sm flex items-center justify-between
 
-                ${isMe
+                ${isMe
                                         ? "bg-blue-50 border-blue-200"
                                         : "bg-white border-gray-100"
                                     }`}
@@ -381,7 +382,7 @@ export default function LeaderboardPage() {
                                     <div
                                         className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg
 
-                    ${medal
+                    ${medal
                                                 ? "bg-yellow-50"
                                                 : isMe
                                                     ? "bg-blue-100 text-blue-700"
@@ -398,7 +399,7 @@ export default function LeaderboardPage() {
                                         <p
                                             className={`font-black text-sm
 
-                      ${isMe
+                      ${isMe
                                                     ? "text-blue-700"
                                                     : "text-gray-800"
                                                 }`}
@@ -436,7 +437,7 @@ export default function LeaderboardPage() {
                                     <p
                                         className={`text-[10px] mt-1 font-black
 
-                    ${u.score >= cutoff
+                    ${u.score >= cutoff
                                                 ? "text-green-600"
                                                 : "text-red-500"
                                             }`}
@@ -488,7 +489,7 @@ export default function LeaderboardPage() {
                     <div
                         className={`px-3 py-1 rounded-full text-[10px] font-black
 
-            ${userRank.score >= cutoff
+            ${userRank.score >= cutoff
                                 ? "bg-green-600"
                                 : "bg-red-600"
                             }`}
