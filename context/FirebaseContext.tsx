@@ -20,8 +20,14 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
 
 export function useFirebase() {
   const context = useContext(FirebaseContext);
+
   if (!context) {
-    throw new Error("useFirebase must be used within FirebaseProvider");
+    // Server-side production build (prerendering) ke waqt error bypass karne ke liye safe check
+    if (typeof window === 'undefined') {
+      return { auth: null, db: null } as any;
+    }
+    throw new Error("useFirebase must be used within a FirebaseProvider.");
   }
+
   return context;
 }
