@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getDb } from "@/lib/firebase-admin";
 
 export async function GET() {
