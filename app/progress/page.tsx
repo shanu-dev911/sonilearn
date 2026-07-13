@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
-
 "use client";
+
+export const dynamic = 'force-dynamic';
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "@/lib/firebase-client";
