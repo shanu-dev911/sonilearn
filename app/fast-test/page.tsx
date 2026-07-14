@@ -201,7 +201,7 @@ export default function FastTestPage() {
           return;
         }
 
-        setQuestions(loadedQuestions.sort(() => Math.random() - 0.5).slice(0, 15));
+        setQuestions(loadedQuestions.sort(() => Math.random() - 0.5).slice(0, 25));
       } catch (err) {
         setError("Failed to resolve technical cluster questions mapping.");
       } finally {
