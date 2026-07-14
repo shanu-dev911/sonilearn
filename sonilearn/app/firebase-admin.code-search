@@ -1,0 +1,79 @@
+# Query: firebase-admin
+
+29 results - 25 files
+
+package-lock.json:
+    14:         "firebase-admin": "^13.7.0",
+  4831:     "node_modules/firebase-admin": {
+  4833:       "resolved": "https://registry.npmjs.org/firebase-admin/-/firebase-admin-13.7.0.tgz",
+
+package.json:
+  15:     "firebase-admin": "^13.7.0",
+
+app\admin\news\page.tsx:
+  3:  import { auth, dbClient } from "@/lib/firebase-client";
+
+app\admin\pdfs\page.tsx:
+  4:  import { auth, dbClient } from "@/lib/firebase-client";
+app\ai-mentor\page.tsx:
+  5:  import { auth, dbClient } from "@/lib/firebase-client";
+
+app\api\analytics\route.ts:
+  2: import { db } from "@/lib/firebase-admin"
+
+app\api\current-affairs\route.ts:
+  2: import { db } from "@/lib/firebase-admin"
+
+app\api\leaderboard\route.ts:
+  2: import { db } from "@/lib/firebase-admin"
+
+app\api\submit-test\route.ts:
+  2: import { db } from "@/lib/firebase-admin"
+
+app\api\test-db\route.ts:
+  1: import { db } from "@/lib/firebase-admin";
+
+app\api\user-results\route.ts:
+  2: import { db } from "@/lib/firebase-admin"
+  4: import { auth } from "@/lib/firebase-admin"
+
+app\api\week-subject\route.ts:
+  2: import { db } from "@/lib/firebase-admin"
+
+app\complete-profile\page.tsx:
+  3: import { auth, dbClient } from "@/lib/firebase-client";
+
+app\current-affairs\page.tsx:
+  4:  import { auth, dbClient } from "@/lib/firebase-client";
+
+app\forgot-password\page.tsx:
+  6: import { auth, dbClient } from "@/lib/firebase-client";
+
+app\login\page.tsx:
+  6: import { auth, dbClient } from "@/lib/firebase-client";
+
+app\profile\page.tsx:
+  4:  import { auth, dbClient } from "@/lib/firebase-client";
+
+app\progress\page.tsx:
+  4:  import { auth, dbClient } from "@/lib/firebase-client";
+
+app\pyq\page.tsx:
+  4: import { auth, dbClient } from "@/lib/firebase-client";
+
+app\signup\page.tsx:
+  6: import { auth, dbClient } from "@/lib/firebase-client"; 
+
+app\study-material\page.tsx:
+  4: import { auth, dbClient } from "@/lib/firebase-client";
+
+app\subscription\page.tsx:
+  6:  import { auth, dbClient } from "@/lib/firebase-client";
+lib\firebase-admin.ts:
+  1: import admin from "firebase-admin";
+
+lib\getQuestions.ts:
+  2: import { db } from "@/lib/firebase-admin";
+
+lib\usePremium.ts:
+  4: import { auth, dbClient } from "@/lib/firebase-client"
