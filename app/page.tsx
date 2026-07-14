@@ -3,59 +3,19 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
-import { auth, db } from "@/lib/firebase-client";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck } from "lucide-react";
 
 export default function Dashboard() {
-  const [userName, setUserName] = useState("Student");
+  const [userName, setUserName] = useState("Shanu");
   const [targetExam, setTargetExam] = useState("SSC GD");
   const [isPremium, setIsPremium] = useState(false);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const userRef = doc(db, "users", user.uid);
-          const snap = await getDoc(userRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            setUserName(data.name?.split(" ")[0] || "Student");
-            setTargetExam(data.targetExam || "SSC GD");
-            setIsPremium(data.isPremium || false);
-          }
-        } catch (error) {
-          console.log(error);
-        }
-      } else {
-        router.push("/login");
-      }
-
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [router]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-slate-500 text-sm font-medium tracking-wide">Securing session...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans selection:bg-blue-600 selection:text-white">
       {/* GLOBAL ENTERPRISE NAVBAR */}
-      <header className="sticky top-0确定 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 transition-all duration-300">
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
           <div className="flex items-center justify-between">
             {/* BRAND BRANDING */}
