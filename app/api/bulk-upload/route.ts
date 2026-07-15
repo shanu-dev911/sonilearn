@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase-client";
-import { doc, setDoc } from "firebase/firestore";
+import { getDb } from "@/lib/firebase-admin";
 
 // Array ke options ko live shake/shuffle karne ki utility
 function shuffleOptions(array: string[]): string[] {
@@ -307,6 +306,7 @@ export async function GET() {
         }
 
         let uploadCount = 0;
+        const adminDb = getDb();
 
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
@@ -345,14 +345,13 @@ export async function GET() {
             else if (sanitizedQuestion.optionC === realCorrectAnswerText) sanitizedQuestion.answer = "C";
             else if (sanitizedQuestion.optionD === realCorrectAnswerText) sanitizedQuestion.answer = "D";
 
-            // ---- 3. SECURE WRITE TO FIRESTORE ----
+            // ---- 3. SECURE WRITE TO FIRESTORE (server-side admin) ----
             // Hum har doc ki ID pure manual standard fix parameter par match karenge
             const uniqueDocId = `q_bulk_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-            const docRef = doc(db, "questions", uniqueDocId);
 
-            await setDoc(docRef, {
+            await adminDb.collection("questions").doc(uniqueDocId).set({
                 ...sanitizedQuestion,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
             });
 
             uploadCount++;
