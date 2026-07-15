@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth, dbClient } from "@/lib/firebase-client";
+import { auth, db } from "@/lib/firebase-client";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Send, Loader2, Bot } from "lucide-react";
@@ -28,7 +28,7 @@ export default function AIDoubtSolver() {
 
         const fetchCount = async () => {
             const today = new Date().toISOString().split("T")[0];
-            const userRef = doc(dbClient, "users", user.uid);
+            const userRef = doc(db, "users", user.uid);
             const snap = await getDoc(userRef);
 
             if (snap.exists()) {
@@ -65,7 +65,7 @@ export default function AIDoubtSolver() {
 
                 // Update daily count
                 const today = new Date().toISOString().split("T")[0];
-                const userRef = doc(dbClient, "users", user!.uid);
+                const userRef = doc(db, "users", user!.uid);
                 await updateDoc(userRef, {
                     [`doubtCount.${today}`]: dailyCount + 1
                 });

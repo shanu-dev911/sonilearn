@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { dbClient } from "@/lib/firebase-client"
+import { db } from "@/lib/firebase-client"
 import { doc, getDoc } from "firebase/firestore"
 
 export default function CurrentAffairDetail() {
@@ -16,7 +16,7 @@ export default function CurrentAffairDetail() {
 
     useEffect(() => {
         const fetchData = async () => {
-            const ref = doc(dbClient, "current_affairs", id as string)
+            const ref = doc(db, "current_affairs", id as string)
             const snap = await getDoc(ref)
 
             if (snap.exists()) {

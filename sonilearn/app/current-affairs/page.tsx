@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { auth, dbClient } from "@/lib/firebase-client"
+import { auth, db } from "@/lib/firebase-client"
 import { collection, getDocs, query, orderBy, doc, setDoc, deleteDoc, limit } from "firebase/firestore"
 import { onAuthStateChanged } from "firebase/auth"
 
@@ -27,7 +27,7 @@ export default function CurrentAffairs() {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setUserId(user.uid)
-                const downloadsRef = collection(dbClient, "users", user.uid, "downloads")
+                const downloadsRef = collection(db, "users", user.uid, "downloads")
                 const snapshot = await getDocs(downloadsRef)
                 setDownloadedIds(snapshot.docs.map(doc => doc.id))
             } else {
@@ -39,7 +39,7 @@ export default function CurrentAffairs() {
             setLoading(true)
             try {
                 // 10 news fetch hogi (Admin me ek baar dobara fetch kar lena)
-                const q = query(collection(dbClient, "current_affairs"), orderBy("createdAt", "desc"), limit(10));
+                const q = query(collection(db, "current_affairs"), orderBy("createdAt", "desc"), limit(10));
                 const querySnapshot = await getDocs(q);
                 const fetchedNews: any[] = [];
                 querySnapshot.forEach((doc) => {
@@ -60,7 +60,7 @@ export default function CurrentAffairs() {
     const toggleDownload = async (newsId: string, newsItem: any) => {
         if (!userId) { alert("⚠️ Please login to download news!"); return; }
         const isDownloaded = downloadedIds.includes(newsId);
-        const downloadRef = doc(dbClient, "users", userId, "downloads", newsId);
+        const downloadRef = doc(db, "users", userId, "downloads", newsId);
         try {
             if (isDownloaded) {
                 await deleteDoc(downloadRef);
