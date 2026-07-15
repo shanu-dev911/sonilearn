@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase-client";
+import { doc, setDoc } from "firebase/firestore";
 
 // Array ke options ko live shake/shuffle karne ki utility
-function shuffleOptions(array: string[]): string[] {
+function shuffleOptions(array) {
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -59,7 +60,7 @@ export async function GET() {
                 "optionD": "Liver / यकृत (लीवर)",
                 "answer": "D",
                 "explanationEn": "Hepatitis refers to the inflammation of the liver, which can be caused by viral infections or toxins.",
-                "explanationHi": "हेपेटाइटिस का तात्पर्य लीवर की सूजन से है, जो वायरल संक्रमण या विषाक्त पदार्थों के कारण हो सकता है।"
+                "explanationHi": "हेपेटाइटिस का तात्पर्य लीवर की सूजन से है, जो viral संक्रमण या विषाक्त पदार्थों के कारण हो सकता है।"
             },
             {
                 "exam": "RRB_Technician",
@@ -129,7 +130,7 @@ export async function GET() {
                 "optionD": "Faraday's Law / फैराडे का नियम",
                 "answer": "B",
                 "explanationEn": "Ohm's Law states that V = IR, meaning voltage (V) and current (I) are directly proportional under constant physical conditions.",
-                "explanationHi": "ओम का नियम बताता है कि V = IR, जिसका अर्थ है कि स्थिर भौतिक परिस्थितियों में वोल्टेज (V) और धारा (I) सीधे आनुपातिक होते हैं।"
+                "explanationHi": "ओम का नियम बताता है कि V = IR, जिसका अर्थ है कि स्थिर भौतिक परिस्थितियों में वोल्टेज (V) aur dhara (I) सीधे आनुपातिक होते हैं।"
             },
             {
                 "exam": "RRB_Technician",
@@ -164,7 +165,7 @@ export async function GET() {
                 "subject": "General Science",
                 "difficulty": "easy",
                 "questionEn": "What is the primary gas present in Natural Gas and CNG?",
-                "questionHi": "प्राकृतिक गैस (Natural Gas) और सीएनजी (CNG) में मौजूद मुख्य गैस कौन सी है?",
+                "questionHi": "प्राकृतिक गैस (Natural Gas) और सीएनजी (CNG) में मौजूद मुख्य gas कौन सी है?",
                 "optionA": "Methane / मीथेन",
                 "optionB": "Butane / ब्यूटेन",
                 "optionC": "Propane / प्रोपेन",
@@ -241,14 +242,14 @@ export async function GET() {
                 "optionD": "Heat to Electrical / ऊष्मा से विद्युत",
                 "answer": "B",
                 "explanationEn": "A battery or cell stores energy in chemical form and converts it into electrical energy during a redox reaction.",
-                "explanationHi": "एक बैटरी या सेल रासायनिक रूप में ऊर्जा को संग्रहीत करता है और रेडॉक्स प्रतिक्रिया के दौरान इसे विद्युत ऊर्जा में परिवर्तित करता है।"
+                "explanationHi": "एक बैटरी या सेल रासायनिक रूप में ऊर्जा को संग्रहीत करता है aur redox प्रतिक्रिया के दौरान इसे विद्युत ऊर्जा में परिवर्तित करता है।"
             },
             {
                 "exam": "RRB_Technician",
                 "subject": "General Science",
                 "difficulty": "easy",
                 "questionEn": "What is the powerhouse of the cell called?",
-                "questionHi": "कोशिका का पावरहाउस (ऊर्जा गृह) किसे कहा जाता है?",
+                "questionHi": "कोशिका का powerहाउस (ऊर्जा गृह) किसे कहा जाता है?",
                 "optionA": "Mitochondria / माइटोकॉन्ड्रिया",
                 "optionB": "Nucleus / केंद्रक",
                 "optionC": "Ribosome / राइबोसोम",
@@ -299,25 +300,21 @@ export async function GET() {
                 "explanationEn": "Mercury is the only metallic element that is liquid at standard conditions for temperature and pressure.",
                 "explanationHi": "पारा (Mercury) एकमात्र ऐसा धातु तत्व है जो तापमान और दबाव की मानक स्थितियों में तरल अवस्था में रहता है।"
             }
-        ]
+        ];
 
         if (!Array.isArray(questions) || questions.length === 0) {
             return NextResponse.json({ success: false, message: "❌ Code ke andar array khali hai!" }, { status: 400 });
         }
 
         let uploadCount = 0;
-        const adminDb = getDb();
 
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
 
-            // ---- 1. BAD DATA FILTER ----
             if (!q.questionEn || !q.optionA || !q.optionB || !q.optionC || !q.optionD || !q.answer) {
                 continue;
             }
 
-            // ---- 2. BACKEND LIVE AUTO-CORRECT ENGINE ----
-            // Pata lagao ki raw answer key string ke mutabik correct text kya hai
             let realCorrectAnswerText = "";
             if (q.answer === "A") realCorrectAnswerText = q.optionA;
             else if (q.answer === "B") realCorrectAnswerText = q.optionB;
@@ -326,7 +323,6 @@ export async function GET() {
 
             if (!realCorrectAnswerText) realCorrectAnswerText = q.optionA;
 
-            // Options ko strict clean dynamic mix karo
             const optionsPool = [q.optionA, q.optionB, q.optionC, q.optionD];
             const randomizedOptions = shuffleOptions(optionsPool);
 
@@ -336,22 +332,20 @@ export async function GET() {
                 optionB: randomizedOptions[1],
                 optionC: randomizedOptions[2],
                 optionD: randomizedOptions[3],
-                answer: "A" // Safe default assignation
+                answer: "A"
             };
 
-            // Correct string target update tracker logic
             if (sanitizedQuestion.optionA === realCorrectAnswerText) sanitizedQuestion.answer = "A";
             else if (sanitizedQuestion.optionB === realCorrectAnswerText) sanitizedQuestion.answer = "B";
             else if (sanitizedQuestion.optionC === realCorrectAnswerText) sanitizedQuestion.answer = "C";
             else if (sanitizedQuestion.optionD === realCorrectAnswerText) sanitizedQuestion.answer = "D";
 
-            // ---- 3. SECURE WRITE TO FIRESTORE (server-side admin) ----
-            // Hum har doc ki ID pure manual standard fix parameter par match karenge
             const uniqueDocId = `q_bulk_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+            const docRef = doc(db, "questions", uniqueDocId);
 
-            await adminDb.collection("questions").doc(uniqueDocId).set({
+            await setDoc(docRef, {
                 ...sanitizedQuestion,
-                createdAt: new Date().toISOString(),
+                createdAt: new Date().toISOString()
             });
 
             uploadCount++;
@@ -363,7 +357,7 @@ export async function GET() {
             message: `✅ Gazab Shanu bhai! Pure ${uploadCount} questions autoshuffled aur sanitized hokar direct database mein load ho gaye!`
         });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error(error);
         return NextResponse.json({
             success: false,
