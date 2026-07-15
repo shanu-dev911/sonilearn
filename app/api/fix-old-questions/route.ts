@@ -5,7 +5,7 @@ import { db } from "@/lib/firebase-client";
 import { collection, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
 
 // Options ko randomly shake/mix karne ki utility
-function shuffleOptions(array: string[]): string[] {
+function shuffleOptions(array) {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -21,7 +21,7 @@ export async function GET() {
     
     let updatedCount = 0;
     let deletedDuplicatesCount = 0;
-    const seenQuestionTexts = new Set<string>();
+    const seenQuestionTexts = new Set();
 
     console.log(`🤖 Total ${querySnapshot.size} puraane sawal mile. Processing shuru...`);
 
@@ -90,7 +90,7 @@ export async function GET() {
       duplicatesDeleted: deletedDuplicatesCount
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
