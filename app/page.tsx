@@ -43,16 +43,16 @@ export default function Dashboard() {
 
             {/* ACTION PIPELINE */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* FIXED DYNAMIC MEMBERSHIP BADGE */}
               <div
-                className={`flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${
                   isPremium
                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                    : "bg-blue-50 text-blue-700 border border-blue-200"
                 }`}
               >
                 {isPremium ? <ShieldCheck size={10} className="sm:w-3 sm:h-3" /> : <Zap size={10} className="sm:w-3 sm:h-3" />}
-                <span className="hidden xs:inline">{isPremium ? "Enterprise Pro" : "Standard Tier"}</span>
-                <span className="xs:hidden">{isPremium ? "Pro" : "Std"}</span>
+                <span>{isPremium ? "Paid" : "Free Tier"}</span>
               </div>
 
               {!isPremium && (
@@ -117,7 +117,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* COMPACT INTERACTIVE DASHBOARD CARDS - FIXED MOBILE SPACING & FLOW */}
+        {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 mb-6">
 
           {/* DAILY CHALLENGE CARD */}
