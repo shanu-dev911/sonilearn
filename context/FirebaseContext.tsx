@@ -35,7 +35,7 @@ export function useFirebase() {
   const context = useContext(FirebaseContext);
 
   if (!context) {
-    // Server-side production build (prerendering) ke waqt error bypass karne ke liye safe check
+    // Server-side production build (prerendering) - safe check to bypass error during build time
     if (typeof window === 'undefined') {
       return { auth: null, db: null } as any;
     }
