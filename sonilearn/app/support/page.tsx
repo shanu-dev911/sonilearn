@@ -1,1 +1,0 @@
-import React from "react"; export default function SupportPage() { return <div className="p-8 text-center"><h1>Support & Help Desk</h1><p>Welcome to SoniLearn Support.</p></div>; }

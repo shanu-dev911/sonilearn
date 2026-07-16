@@ -1,16 +1,29 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import { auth, db } from "@/lib/firebase-client";
 
 type FirebaseContextType = {
-  auth: typeof auth;
-  db: typeof db;
+  auth: any;
+  db: any;
 };
 
 const FirebaseContext = createContext<FirebaseContextType | null>(null);
 
 export function FirebaseProvider({ children }: { children: ReactNode }) {
+  // Lazy load Firebase only on client side
+  let auth = null;
+  let db = null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const firebase = require("@/lib/firebase-client");
+      auth = firebase.auth;
+      db = firebase.db;
+    } catch (error) {
+      console.warn("Firebase context initialization:", error);
+    }
+  }
+
   return (
     <FirebaseContext.Provider value={{ auth, db }}>
       {children}

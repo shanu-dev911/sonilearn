@@ -9,36 +9,44 @@ import {
 
 // FIREBASE CONFIG
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "demo-key",
 
     authDomain:
-        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "demo.firebaseapp.com",
 
     projectId:
-        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "demo-project",
 
     storageBucket:
-        process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "demo.appspot.com",
 
     messagingSenderId:
-        process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "demo-sender",
 
     appId:
-        process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+        process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "demo-app",
 };
 
-// APP
-const app =
-    getApps().length > 0
-        ? getApp()
-        : initializeApp(firebaseConfig);
+// APP - Only initialize on client side
+let app: any;
+let auth: any;
+let db: any;
 
-// AUTH
-export const auth = getAuth(app);
+if (typeof window !== 'undefined') {
+    try {
+        app =
+            getApps().length > 0
+                ? getApp()
+                : initializeApp(firebaseConfig);
 
-// FIRESTORE FAST CACHE
-export const db = initializeFirestore(app, {
-    localCache: persistentLocalCache(),
-});
+        auth = getAuth(app);
 
-export { app };
+        db = initializeFirestore(app, {
+            localCache: persistentLocalCache(),
+        });
+    } catch (error) {
+        console.warn("Firebase initialization warning:", error);
+    }
+}
+
+export { app, auth, db };

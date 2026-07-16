@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck } from "lucide-react";
 
 export default function Dashboard() {
@@ -18,21 +19,25 @@ export default function Dashboard() {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
           <div className="flex items-center justify-between">
-            {/* BRAND BRANDING */}
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-600 text-white font-black w-9 h-9 rounded-xl flex items-center justify-center text-lg tracking-tighter shadow-md shadow-blue-600/20">
-                S
+            {/* BRAND LOGO */}
+            <div className="flex items-center gap-2.5">
+              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                <Image
+                  src="/logo.svg"
+                  alt="SoniLearn Logo"
+                  width={40}
+                  height={40}
+                  priority
+                  className="w-full h-full"
+                />
               </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none uppercase">
-                  SoniLearn
+              <div className="flex flex-col justify-center">
+                <h1 className="text-lg font-black text-blue-700 tracking-tight leading-none">
+                  SONI<span className="text-cyan-500">learn</span>
                 </h1>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <p className="text-[10px] text-slate-500 font-bold tracking-wider uppercase">
-                    Portal: {targetExam}
-                  </p>
-                </div>
+                <p className="text-[9px] text-slate-500 font-bold tracking-wider uppercase mt-0.5">
+                  Your Daily Practice Partner
+                </p>
               </div>
             </div>
 
@@ -89,6 +94,7 @@ export default function Dashboard() {
             </div>
             <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 min-w-[200px] flex flex-col justify-center">
               <span className="text-xs text-slate-400 font-semibold tracking-wider uppercase">Target Track</span>
+              {/* FIXED DYNAMIC TRACK EXAM RENDERING HERE */}
               <span className="text-xl font-black mt-1 text-white tracking-tight">{targetExam}</span>
             </div>
           </div>
