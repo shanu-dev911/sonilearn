@@ -1,10 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
+import { getAuth, Auth } from "firebase/auth";
+import { initializeFirestore, persistentLocalCache, Firestore } from "firebase/firestore";
 
-// =========================
-// FIREBASE CONFIG - SECURE ENVS
-// =========================
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -14,53 +11,36 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// =========================
-// VALIDATE ENV VARS SAFELY (ONLY ON CLIENT SIDE)
-// =========================
-if (typeof window !== "undefined") {
-  const missingKeys = Object.entries(firebaseConfig)
-    .filter(([, value]) => !value)
-    .map(([key]) => key);
+// Check if config keys are actually present
+const isConfigValid = !!firebaseConfig.apiKey && firebaseConfig.projectId !== "dummy-project-id";
 
-  if (missingKeys.length > 0) {
-    const envVarNames = missingKeys
-      .map((key) => `NEXT_PUBLIC_FIREBASE_${key.replace(/([A-Z])/g, "_$1").toUpperCase()}`)
-      .join(", ");
+const dummyConfig = { 
+  apiKey: "dummy-key-for-build",
+  authDomain: "dummy-auth.firebaseapp.com",
+  projectId: "dummy-project-id",
+  storageBucket: "dummy-storage.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:dummy"
+};
 
-    console.warn(
-      `[firebase-client] Warning: Missing Firebase config keys: ${envVarNames}. ` +
-      `Ensure your .env.local file has these values.`
-    );
-  }
-}
-
-// =========================
-// INITIALIZE APP SAFELY
-// =========================
-// Agar build time par apiKey nahi milti toh temporary dummy values pass karenge taaki initializeApp crash na ho
-const isConfigValid = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
-
+// 1. Initialize App Safely
 const app = getApps().length > 0 
   ? getApp() 
-  : initializeApp(isConfigValid ? firebaseConfig : { 
-      apiKey: "dummy-key-for-build",
-      authDomain: "dummy-auth.firebaseapp.com",
-      projectId: "dummy-project-id",
-      storageBucket: "dummy-storage.appspot.com",
-      messagingSenderId: "1234567890",
-      appId: "1:1234567890:web:dummy"
-    });
+  : initializeApp(isConfigValid ? firebaseConfig : dummyConfig);
 
-// =========================
-// AUTH PRODUCTION EXPORT
-// =========================
-const auth = getAuth(app);
+// 2. Initialize Auth & DB conditionally to prevent stale instances
+let auth: Auth;
+let db: Firestore;
 
-// =========================
-// FIRESTORE OFFLINE CACHE EXPORT
-// =========================
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache(),
-});
+if (isConfigValid) {
+  auth = getAuth(app);
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache(),
+  });
+} else {
+  // Fallback for build time only to prevent compilation export errors
+  auth = getAuth(app);
+  db = initializeFirestore(app, {});
+}
 
 export { app, auth, db };
