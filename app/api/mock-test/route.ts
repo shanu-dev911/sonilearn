@@ -24,8 +24,8 @@ export async function GET(req: Request) {
 
         let questions: any[] = snapshot.docs.map((doc) => ({
             id: doc.id,
-            ...doc.data(),
-        }));
+            ...(doc.data() as object), // 💡 'as object' likhne se TypeScript shant ho jayega
+        }));  
 
         // shuffle
         questions = questions.sort(() => Math.random() - 0.5);
