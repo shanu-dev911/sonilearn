@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 type Question = {
     questionEn: string;
@@ -43,7 +43,10 @@ export default function LiveMockTest() {
             .then((res) => res.json())
             .then((data) => {
                 setQuestions(data || []);
-                setAnswers(new Array(data.length).fill(""));
+                setAnswers(new Array(data.length || 0).fill(""));
+                setLoading(false);
+            })
+            .catch(() => {
                 setLoading(false);
             });
     }, [subject]);
@@ -103,9 +106,10 @@ export default function LiveMockTest() {
         return <div className="min-h-screen flex items-center justify-center">No Questions 😢</div>;
     }
 
-    const q = questions[index] || {};
+    // 🔥 FIX: TypeScript fallback ko restrict kiya taaki '{}' strict type error na aaye
+    const q: Question = questions[index];
 
-    // ✅ RESULT PAGE (same + clean)
+    // ✅ RESULT PAGE
     if (finished) {
         return (
             <div className="min-h-screen p-4 text-center">
@@ -118,7 +122,6 @@ export default function LiveMockTest() {
                 <div className="mt-6 space-y-4 max-w-2xl mx-auto text-left">
                     {questions.map((ques, i) => (
                         <div key={i} className="p-4 bg-white rounded-xl shadow">
-
                             <p className="font-semibold">
                                 Q{i + 1}. {ques.questionEn}
                             </p>
@@ -152,7 +155,6 @@ export default function LiveMockTest() {
 
     return (
         <div className="min-h-screen bg-slate-100">
-
             {/* HEADER */}
             <div className="bg-white shadow p-4 flex justify-between items-center">
                 <button onClick={() => router.push("/")}>
@@ -168,19 +170,18 @@ export default function LiveMockTest() {
 
             {/* QUESTION */}
             <div className="p-4 max-w-xl mx-auto">
-
                 <p className="text-sm text-gray-500">
                     Question {index + 1} / {questions.length}
                 </p>
 
                 <h2 className="mt-3 font-semibold text-lg">
-                    {q.questionEn}
+                    {q?.questionEn}
                 </h2>
 
                 {/* OPTIONS */}
                 <div className="mt-5 space-y-3">
                     {["A", "B", "C", "D"].map((opt) => {
-                        const isCorrect = q.answer === opt;
+                        const isCorrect = q?.answer === opt;
                         const isSelected = selected === opt;
 
                         return (
@@ -207,14 +208,14 @@ export default function LiveMockTest() {
                     })}
                 </div>
 
-                {/* ✅ EXPLANATION SHOW */}
+                {/* EXPLANATION SHOW */}
                 {selected && (
                     <div className="mt-4 p-3 bg-white rounded-xl border">
                         <p className="text-green-600 font-semibold">
-                            Correct Answer: {q.answer}
+                            Correct Answer: {q?.answer}
                         </p>
 
-                        {q.explanationHi && (
+                        {q?.explanationHi && (
                             <p className="text-sm text-gray-600 mt-1">
                                 👉 {q.explanationHi}
                             </p>
