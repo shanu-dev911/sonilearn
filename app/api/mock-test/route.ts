@@ -22,10 +22,13 @@ export async function GET(req: Request) {
 
         const snapshot = await getDocs(q);
 
-        let questions: any[] = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...(doc.data() as object), // 💡 'as object' likhne se TypeScript shant ho jayega
-        }));  
+        let questions: any[] = snapshot.docs.map((doc) => {
+            const data = doc.data() as Record<string, any>; // Record type TypeScript ko 100% satisfy karega
+            return {
+                id: doc.id,
+                ...data,
+            };
+        });  
 
         // shuffle
         questions = questions.sort(() => Math.random() - 0.5);
