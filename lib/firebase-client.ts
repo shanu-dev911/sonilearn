@@ -14,7 +14,7 @@ const firebaseConfig = {
 // Check if config keys are actually present
 const isConfigValid = !!firebaseConfig.apiKey && firebaseConfig.projectId !== "dummy-project-id";
 
-const dummyConfig = { 
+const dummyConfig = {
   apiKey: "dummy-key-for-build",
   authDomain: "dummy-auth.firebaseapp.com",
   projectId: "dummy-project-id",
@@ -24,8 +24,8 @@ const dummyConfig = {
 };
 
 // 1. Initialize App Safely
-const app = getApps().length > 0 
-  ? getApp() 
+const app = getApps().length > 0
+  ? getApp()
   : initializeApp(isConfigValid ? firebaseConfig : dummyConfig);
 
 // 2. Initialize Auth & DB conditionally to prevent stale instances
