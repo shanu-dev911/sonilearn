@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { sendPasswordResetEmail } from "firebase/auth"
-import { auth, db} from "@/lib/firebase-client"
+import { auth } from "@/lib/firebase-client"
 import { FiMail } from "react-icons/fi"
 
 export default function ForgotPassword() {
@@ -32,7 +32,7 @@ export default function ForgotPassword() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 font-sans">
             <div className="w-full max-w-md">
                 <div className="text-center mb-10">
-                    
+
                     <h1 className="text-4xl font-black text-blue-700 tracking-tight">SoniLearn</h1>
                     <p className="text-gray-400 font-medium">Reset your password 🔒</p>
                 </div>
