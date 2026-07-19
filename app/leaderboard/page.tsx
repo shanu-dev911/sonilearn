@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { db, auth } from "@/lib/firebase-client";
 
 import {
@@ -14,6 +15,7 @@ import {
 } from "firebase/firestore";
 
 import { onAuthStateChanged, User } from "firebase/auth";
+import { ArrowLeft } from "lucide-react";
 
 interface LeaderboardEntry {
     id: string;
@@ -25,6 +27,8 @@ interface LeaderboardEntry {
 }
 
 export default function LeaderboardPage() {
+
+    const router = useRouter();
 
     const [data, setData] = useState<LeaderboardEntry[]>([]);
 
@@ -193,7 +197,15 @@ export default function LeaderboardPage() {
         <div className="min-h-screen bg-slate-50 pb-32">
 
             {/* HEADER */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 px-5 pt-14 pb-10 text-center">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 px-5 pt-14 pb-10 text-center relative">
+
+                {/* BACK BUTTON */}
+                <button
+                    onClick={() => router.back()}
+                    className="absolute left-5 top-14 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-95 transition"
+                >
+                    <ArrowLeft size={20} />
+                </button>
 
                 <h1 className="text-4xl font-black text-white">
                     🏆 Leaderboard
@@ -213,7 +225,7 @@ export default function LeaderboardPage() {
                     <div
                         className={`rounded-[2rem] p-5 shadow-xl text-white flex items-center justify-between gap-4
 
-            ${userRank.score >= cutoff
+            ${userRank.score >= cutoff
                                 ? "bg-gradient-to-r from-green-600 to-emerald-700"
                                 : "bg-gradient-to-r from-blue-600 to-indigo-700"
                             }`}
@@ -254,7 +266,7 @@ export default function LeaderboardPage() {
                             <div
                                 className={`mt-2 px-3 py-1 rounded-full text-[10px] font-black
 
-                ${userRank.score >= cutoff
+                ${userRank.score >= cutoff
                                         ? "bg-white/20"
                                         : "bg-red-500/30"
                                     }`}
@@ -371,7 +383,7 @@ export default function LeaderboardPage() {
                                 key={u.id}
                                 className={`rounded-[1.5rem] p-4 border shadow-sm flex items-center justify-between
 
-                ${isMe
+                ${isMe
                                         ? "bg-blue-50 border-blue-200"
                                         : "bg-white border-gray-100"
                                     }`}
@@ -383,7 +395,7 @@ export default function LeaderboardPage() {
                                     <div
                                         className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg
 
-                    ${medal
+                    ${medal
                                                 ? "bg-yellow-50"
                                                 : isMe
                                                     ? "bg-blue-100 text-blue-700"
@@ -400,7 +412,7 @@ export default function LeaderboardPage() {
                                         <p
                                             className={`font-black text-sm
 
-                      ${isMe
+                      ${isMe
                                                     ? "text-blue-700"
                                                     : "text-gray-800"
                                                 }`}
@@ -438,7 +450,7 @@ export default function LeaderboardPage() {
                                     <p
                                         className={`text-[10px] mt-1 font-black
 
-                    ${u.score >= cutoff
+                    ${u.score >= cutoff
                                                 ? "text-green-600"
                                                 : "text-red-500"
                                             }`}
@@ -490,7 +502,7 @@ export default function LeaderboardPage() {
                     <div
                         className={`px-3 py-1 rounded-full text-[10px] font-black
 
-            ${userRank.score >= cutoff
+            ${userRank.score >= cutoff
                                 ? "bg-green-600"
                                 : "bg-red-600"
                             }`}

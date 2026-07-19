@@ -4,10 +4,10 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase-client";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, User, Mail, ShieldCheck, Target, LogOut, Check, Edit2, BookmarkCheck } from "lucide-react";
+import { ArrowLeft, User, Mail, ShieldCheck, Target, LogOut, Check, Edit2, BookmarkCheck, MessageSquare, Send } from "lucide-react";
 
 // 🎯 EXAMS CONFIGURATION PIPELINE
 const examsData = [
@@ -25,7 +25,10 @@ export default function ProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [targetExam, setTargetExam] = useState("");
 
-    // LOAD USER PROFILE DATA
+    const [feedbackText, setFeedbackText] = useState("");
+    const [feedbackSending, setFeedbackSending] = useState(false);
+    const [feedbackSent, setFeedbackSent] = useState(false);
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             try {
@@ -52,7 +55,6 @@ export default function ProfilePage() {
         return () => unsubscribe();
     }, [router]);
 
-    // UPDATE TARGET DATA ASSIGNMENT
     const handleUpdate = async () => {
         try {
             if (!user || !targetExam) return;
@@ -74,7 +76,42 @@ export default function ProfilePage() {
         }
     };
 
-    // LOGOUT ACTION
+    const handleFeedbackSubmit = async () => {
+        if (!feedbackText.trim()) return;
+
+        try {
+            setFeedbackSending(true);
+
+            const feedbackData = {
+                userId: user?.uid || "guest",
+                userName: userData?.name || user?.email || "Student",
+                userEmail: user?.email || "",
+                message: feedbackText.trim(),
+            };
+
+            await addDoc(collection(db, "feedback"), {
+                ...feedbackData,
+                createdAt: serverTimestamp(),
+            });
+
+            fetch("/api/send-feedback-notification", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(feedbackData),
+            }).catch((err) => console.log("Notification error:", err));
+
+            setFeedbackText("");
+            setFeedbackSent(true);
+
+            setTimeout(() => setFeedbackSent(false), 4000);
+        } catch (error) {
+            console.log("Feedback Submit Error:", error);
+            alert("Something went wrong. Please try again.");
+        } finally {
+            setFeedbackSending(false);
+        }
+    };
+
     const handleLogout = async () => {
         try {
             await signOut(auth);
@@ -98,14 +135,13 @@ export default function ProfilePage() {
     return (
         <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans antialiased">
 
-            {/* STICKY CONTROL NAV */}
             <div className="bg-white border-b border-slate-200/80 sticky top-0 z-40 backdrop-blur-md">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
                     <button
                         onClick={() => router.push("/")}
                         className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors bg-slate-100 hover:bg-slate-200/60 px-3 py-2 rounded-xl border border-slate-200/40"
                     >
-                        <ArrowLeft size={14} /> Back to Space
+                        <ArrowLeft size={14} /> Back
                     </button>
                     <div className="text-right">
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Workspace Account</span>
@@ -116,7 +152,6 @@ export default function ProfilePage() {
 
             <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
 
-                {/* HERO USER PROFILE GRID */}
                 <div className="relative overflow-hidden bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-900/30 via-transparent to-transparent pointer-events-none" />
                     <div className="relative flex items-center gap-4 sm:gap-5">
@@ -137,10 +172,8 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* ENTERPRISE INTERACTIVE PROFILE TILES */}
                 <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-6 items-start">
 
-                    {/* LEFT WORKSPACE CARD: TARGET EXAM ENGINE */}
                     <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
                             <div>
@@ -173,7 +206,6 @@ export default function ProfilePage() {
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {/* GRID FORMATTED INTERACTIVE MODULE BUTTONS */}
                                 <div>
                                     <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-2.5 block">Select Exam Profile</span>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[260px] overflow-y-auto pr-2 border border-slate-100 p-2 rounded-xl bg-slate-50/50">
@@ -184,8 +216,8 @@ export default function ProfilePage() {
                                                     key={exam}
                                                     onClick={() => setTargetExam(exam)}
                                                     className={`px-3 py-2.5 rounded-xl text-left text-xs font-bold border transition-all flex items-center justify-between ${isSelected
-                                                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/10"
-                                                            : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                                                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/10"
+                                                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                                                         }`}
                                                 >
                                                     <span className="truncate">{exam}</span>
@@ -207,8 +239,8 @@ export default function ProfilePage() {
                                         onClick={handleUpdate}
                                         disabled={!targetExam}
                                         className={`flex-1 rounded-xl py-3 font-bold text-xs text-white transition-all shadow-md ${targetExam
-                                                ? "bg-slate-900 hover:bg-slate-800"
-                                                : "bg-slate-200 cursor-not-allowed shadow-none text-slate-400"
+                                            ? "bg-slate-900 hover:bg-slate-800"
+                                            : "bg-slate-200 cursor-not-allowed shadow-none text-slate-400"
                                             }`}
                                     >
                                         Commit Configuration
@@ -216,9 +248,57 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                         )}
+
+                        <div className="mt-6 pt-6 border-t border-slate-100">
+                            <div className="mb-4">
+                                <h3 className="text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
+                                    <MessageSquare className="text-blue-600" size={18} /> Send Feedback
+                                </h3>
+                                <p className="text-slate-400 text-xs mt-0.5 font-medium">
+                                    Kuch problem hai ya suggestion dena hai? Yahan likhein.
+                                </p>
+                            </div>
+
+                            {feedbackSent && (
+                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-xl p-3 mb-4 flex items-center gap-2">
+                                    <Check size={14} /> Feedback bhej diya gaya! Dhanyawad.
+                                </div>
+                            )}
+
+                            <textarea
+                                value={feedbackText}
+                                onChange={(e) => setFeedbackText(e.target.value)}
+                                placeholder="Apna feedback, suggestion ya problem yahan likhein..."
+                                rows={4}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-medium text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-400 transition resize-none"
+                            />
+
+                            <div className="flex items-center justify-between mt-3 gap-3">
+                                <a
+                                    href="mailto:supportsonilearn@gmail.com"
+                                    className="text-xs font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1.5"
+                                >
+                                    <Mail size={13} /> Email us directly
+                                </a>
+
+                                <button
+                                    onClick={handleFeedbackSubmit}
+                                    disabled={feedbackSending || !feedbackText.trim()}
+                                    className={`inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-bold text-xs text-white transition-all shadow-md ${feedbackSending || !feedbackText.trim()
+                                        ? "bg-slate-200 cursor-not-allowed shadow-none text-slate-400"
+                                        : "bg-blue-600 hover:bg-blue-700"
+                                        }`}
+                                >
+                                    {feedbackSending ? "Sending..." : (
+                                        <>
+                                            <Send size={13} /> Submit
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* RIGHT WORKSPACE CARD: SECURE ACCOUNT SCHEMATICS */}
                     <div className="space-y-5">
                         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
                             <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-4 block">Identity Credentials</span>
@@ -242,7 +322,20 @@ export default function ProfilePage() {
                             </div>
                         </div>
 
-                        {/* ENTERPRISE TERMINATE SESSION OPERATION */}
+                        <div className="bg-blue-50 border border-blue-100 rounded-3xl p-6 shadow-sm">
+                            <span className="text-[11px] text-blue-500 font-bold uppercase tracking-wider mb-3 block">Need Help?</span>
+                            <p className="text-xs text-slate-600 font-medium mb-3">
+                                Kisi bhi query ke liye humein email karein, hum jaldi reply karenge.
+                            </p>
+
+                            <a
+                                href="mailto:supportsonilearn@gmail.com"
+                                className="inline-flex items-center gap-2 bg-white border border-blue-200 text-blue-700 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-blue-100 transition-all"
+                            >
+                                <Mail size={14} /> supportsonilearn@gmail.com
+                            </a>
+                        </div>
+
                         <button
                             onClick={handleLogout}
                             className="w-full inline-flex items-center justify-center gap-2 bg-white hover:bg-red-50 text-red-600 hover:text-red-700 font-bold text-xs py-3.5 px-4 rounded-2xl border border-slate-200/80 hover:border-red-200 shadow-sm transition-all active:scale-98"
@@ -255,5 +348,5 @@ export default function ProfilePage() {
 
             </div>
         </div>
-    );
+    )
 }

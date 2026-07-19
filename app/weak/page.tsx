@@ -21,7 +21,8 @@ import {
   BookOpen,
   RotateCcw,
   Award,
-  Zap
+  Zap,
+  ArrowLeft
 } from "lucide-react";
 
 type Question = {
@@ -189,12 +190,22 @@ export default function WeakPage() {
 
       {/* HEADER INTERFACE */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">SoniLearn Adaptive Engine</span>
-            <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase mt-0.5 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Weak Error Remediation
-            </h1>
+        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {/* BACK BUTTON */}
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition flex-shrink-0"
+            >
+              <ArrowLeft size={16} />
+            </button>
+
+            <div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">SoniLearn Adaptive Engine</span>
+              <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase mt-0.5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Weak Error Remediation
+              </h1>
+            </div>
           </div>
           <div className="bg-rose-50 text-rose-600 border border-rose-100 px-3 py-1.5 rounded-xl text-center">
             <span className="text-[9px] font-black uppercase tracking-wider block text-rose-400">Total Errors</span>
@@ -234,10 +245,10 @@ export default function WeakPage() {
                   onClick={() => selectAnswer(optionEn)}
                   disabled={status === "correct"}
                   className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center justify-between group ${isCorrect && status !== "idle"
-                      ? "border-emerald-600 bg-emerald-50/60 text-emerald-900 shadow-sm"
-                      : isSelected && status === "wrong"
-                        ? "border-rose-500 bg-rose-50/60 text-rose-900"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
+                    ? "border-emerald-600 bg-emerald-50/60 text-emerald-900 shadow-sm"
+                    : isSelected && status === "wrong"
+                      ? "border-rose-500 bg-rose-50/60 text-rose-900"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
                     }`}
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">

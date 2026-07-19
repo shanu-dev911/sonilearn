@@ -9,6 +9,8 @@ import {
   useMemo,
 } from "react";
 
+import { useRouter } from "next/navigation";
+
 import {
   db,
   auth,
@@ -62,6 +64,7 @@ function formatTime(sec: number) {
 }
 
 export default function DailyChallengePage() {
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -368,12 +371,20 @@ export default function DailyChallengePage() {
         <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
           <div className="max-w-md w-full bg-white border border-slate-200 p-6 rounded-2xl shadow-sm text-center">
             <p className="text-red-500 font-bold text-sm tracking-tight">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
-            >
-              Retry Pipeline Alignment
-            </button>
+            <div className="flex gap-2 mt-4 justify-center">
+              <button
+                onClick={() => router.back()}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+              >
+                Retry Pipeline Alignment
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -420,18 +431,28 @@ export default function DailyChallengePage() {
     <div className="min-h-screen bg-slate-50/50 pb-32 antialiased text-slate-900 selection:bg-blue-600 selection:text-white">
 
       {/* BRAND INTERFACE APP BAR */}
-      <header className="bg-white border-b border-slate-200/80 sticky top-0确定 z-50 backdrop-blur-md">
-        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-              SoniLearn Core Engine
-            </span>
-            {/* 🎯 USER TRACK IDENTIFIER: Dynamic verification badge */}
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
-                Challenge: {targetExam}
-              </h1>
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
+        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {/* BACK BUTTON */}
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition flex-shrink-0"
+            >
+              <ArrowLeft size={16} />
+            </button>
+
+            <div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                SoniLearn Core Engine
+              </span>
+              {/* 🎯 USER TRACK IDENTIFIER: Dynamic verification badge */}
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
+                  Challenge: {targetExam}
+                </h1>
+              </div>
             </div>
           </div>
 
@@ -494,18 +515,16 @@ export default function DailyChallengePage() {
                 <button
                   key={i}
                   onClick={() => selectAnswer(optEn)}
-                  className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${
-                    isSelected
+                  className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${isSelected
                       ? "border-blue-600 bg-blue-50/60 shadow-sm shadow-blue-600/5 text-blue-900"
                       : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
-                  }`}
+                    }`}
                 >
                   <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${
-                      isSelected
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isSelected
                         ? "bg-blue-600 text-white"
                         : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                    }`}
+                      }`}
                   >
                     {String.fromCharCode(65 + i)}
                   </div>
@@ -538,8 +557,8 @@ export default function DailyChallengePage() {
               onClick={nextQuestion}
               disabled={!answers[current]}
               className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${answers[current]
-                  ? "bg-slate-900 hover:bg-slate-800 text-white"
-                  : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                ? "bg-slate-900 hover:bg-slate-800 text-white"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                 }`}
             >
               {current === questions.length - 1 ? (
@@ -569,10 +588,10 @@ export default function DailyChallengePage() {
                   key={i}
                   onClick={() => setCurrent(i)}
                   className={`h-9 rounded-lg font-bold text-xs transition-all border ${isCurrent
-                      ? "bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-100"
-                      : isAnswered
-                        ? "bg-blue-50 border-blue-200 text-blue-600 font-black"
-                        : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
+                    ? "bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                    : isAnswered
+                      ? "bg-blue-50 border-blue-200 text-blue-600 font-black"
+                      : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
                     }`}
                 >
                   {i + 1}
