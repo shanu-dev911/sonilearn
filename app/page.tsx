@@ -5,13 +5,42 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase-client";
 import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck } from "lucide-react";
 
 export default function Dashboard() {
-  const [userName, setUserName] = useState("Shanu");
-  const [targetExam, setTargetExam] = useState("SSC GD");
+  const [userName, setUserName] = useState("Student");
+  const [targetExam, setTargetExam] = useState("Not Set");
   const [isPremium, setIsPremium] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userSnap = await getDoc(userDocRef);
+
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            setUserName(data.name || user.displayName || "Student");
+            setTargetExam(data.targetExam || "Not Set");
+            setIsPremium(data.isPremium || false);
+          } else {
+            setUserName(user.displayName || "Student");
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        }
+      } else {
+        router.push("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans selection:bg-blue-600 selection:text-white">
@@ -45,11 +74,10 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 sm:gap-3">
               {/* FIXED DYNAMIC MEMBERSHIP BADGE */}
               <div
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${
-                  isPremium
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${isPremium
                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                     : "bg-blue-50 text-blue-700 border border-blue-200"
-                }`}
+                  }`}
               >
                 {isPremium ? <ShieldCheck size={10} className="sm:w-3 sm:h-3" /> : <Zap size={10} className="sm:w-3 sm:h-3" />}
                 <span>{isPremium ? "Paid" : "Free Tier"}</span>
