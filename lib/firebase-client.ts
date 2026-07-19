@@ -1,6 +1,8 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, Firestore } from "firebase/firestore";
+// lib/firebase-client.ts
+
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,36 +13,26 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Check if config keys are actually present
-const isConfigValid = !!firebaseConfig.apiKey && firebaseConfig.projectId !== "dummy-project-id";
-
-const dummyConfig = {
-  apiKey: "dummy-key-for-build",
-  authDomain: "dummy-auth.firebaseapp.com",
-  projectId: "dummy-project-id",
-  storageBucket: "dummy-storage.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:dummy"
-};
-
-// 1. Initialize App Safely
-const app = getApps().length > 0
-  ? getApp()
-  : initializeApp(isConfigValid ? firebaseConfig : dummyConfig);
-
-// 2. Initialize Auth & DB conditionally to prevent stale instances
+// Sirf browser me hi Firebase initialize karo, build/server-side me nahi
+let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 
-if (isConfigValid) {
+if (typeof window !== "undefined") {
+  if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+    console.error(
+      "❌ Firebase config missing! Check NEXT_PUBLIC_FIREBASE_* env vars in Vercel Settings → Environment Variables."
+    );
+  }
+
+  app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache(),
-  });
+  db = getFirestore(app);
 } else {
-  // Fallback for build time only to prevent compilation export errors
-  auth = getAuth(app);
-  db = initializeFirestore(app, {});
+  // Server-side / build-time placeholder — actual use client-side hi hoga
+  app = {} as FirebaseApp;
+  auth = {} as Auth;
+  db = {} as Firestore;
 }
 
 export { app, auth, db };
