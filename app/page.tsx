@@ -116,7 +116,7 @@ export default function Dashboard() {
                 Workspace Active
               </div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight">
-                Welcome back, {userName}
+                Welcome , {userName}
               </h2>
               <p className="text-slate-400 mt-2 text-xs sm:text-sm md:text-base max-w-xl font-medium leading-relaxed">
                 Your performance track is calibrated. Access your modules below to continue your dynamic assessment pipeline.
@@ -235,7 +235,7 @@ export default function Dashboard() {
                 ⚡ Launch Fast Test Engine
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs font-medium leading-normal">
-                Initiate a high-velocity 5-minute evaluation cycle for structural review.
+                Initiate a high-velocity -minute evaluation cycle for structural review.
               </p>
             </div>
           </div>
