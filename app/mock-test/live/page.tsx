@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +14,16 @@ type Question = {
     optionD: string;
     answer: string;
     explanationHi?: string;
+};
+
+const emptyQuestion: Question = {
+    questionEn: "",
+    optionA: "",
+    optionB: "",
+    optionC: "",
+    optionD: "",
+    answer: "",
+    explanationHi: "",
 };
 
 export default function LiveMockTest() {
@@ -107,7 +116,7 @@ export default function LiveMockTest() {
         return <div className="min-h-screen flex items-center justify-center">No Questions 😢</div>;
     }
 
-    const q = questions[index] || {};
+    const q: Question = questions[index] || emptyQuestion;
 
     // ✅ RESULT PAGE
     if (finished) {
@@ -202,7 +211,7 @@ export default function LiveMockTest() {
                                     }
                                 `}
                             >
-                                ({opt}) {q?.[`option${opt}` as keyof Question]}
+                                ({opt}) {q[`option${opt}` as keyof Question]}
                             </button>
                         );
                     })}
