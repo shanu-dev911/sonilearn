@@ -9,15 +9,9 @@ import { useRouter } from "next/navigation";
 
 // ✅ ONLY SSC + RAILWAY EXAMS
 const examsData: string[] = [
-    "SSC CGL",
-    "SSC CHSL",
-    "SSC MTS",
-    "SSC GD",
-    "SSC CPO",
-    "RRB NTPC",
-    "RRB GROUP D",
-    "RRB ALP",
-    "RRB JE",
+     "SSC CGL", "SSC CHSL", "SSC MTS", "SSC GD", "SSC CPO", "SSC Stenographer", "SSC JE",
+    "RRB NTPC", "RRB Group D", "RRB ALP", "RRB Technician", "RRB JE", "RRB SSE",
+    "RRB Paramedical", "RRB Ministerial & Isolated", "RRB Apprentice"
 ];
 
 export default function CompleteProfile() {
