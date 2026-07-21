@@ -31,6 +31,11 @@ export default function BulkUploadPage() {
   const [duplicates, setDuplicates] = useState(0);
   const [currentExamCount, setCurrentExamCount] = useState<number | null>(null);
   const [currentExamName, setCurrentExamName] = useState("");
+
+  // 🎯 SUBJECT-WISE STATS
+  const [subjectUploadedThisBatch, setSubjectUploadedThisBatch] = useState<Record<string, number>>({});
+  const [subjectTotalInDb, setSubjectTotalInDb] = useState<Record<string, number>>({});
+
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
@@ -40,6 +45,8 @@ export default function BulkUploadPage() {
     setSkipped(0);
     setDuplicates(0);
     setCurrentExamCount(null);
+    setSubjectUploadedThisBatch({});
+    setSubjectTotalInDb({});
 
     let questions: any[] = [];
     try {
@@ -63,6 +70,11 @@ export default function BulkUploadPage() {
     let examName = questions[0]?.exam || "";
     setCurrentExamName(examName);
 
+    // 🎯 Track uploaded count per subject (this batch)
+    const subjectBatchCounts: Record<string, number> = {};
+    // 🎯 Track unique subjects seen in this batch (to fetch DB totals later)
+    const subjectsSeen = new Set<string>();
+
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
 
@@ -71,6 +83,9 @@ export default function BulkUploadPage() {
         setProgress({ done: i + 1, total: questions.length });
         continue;
       }
+
+      const subjectKey = q.subject || "Unknown";
+      subjectsSeen.add(subjectKey);
 
       try {
         const dupQuery = query(
@@ -122,6 +137,9 @@ export default function BulkUploadPage() {
           createdAt: new Date().toISOString(),
         });
         uploadCount++;
+
+        // 🎯 Increment subject batch counter
+        subjectBatchCounts[subjectKey] = (subjectBatchCounts[subjectKey] || 0) + 1;
       } catch (e) {
         console.log("Upload error for question", i, e);
         skipCount++;
@@ -132,13 +150,32 @@ export default function BulkUploadPage() {
 
     setSkipped(skipCount);
     setDuplicates(dupCount);
+    setSubjectUploadedThisBatch(subjectBatchCounts);
 
+    // 🎯 FETCH CURRENT TOTAL COUNT FOR THIS EXAM
     try {
       const countQuery = query(collection(db, "questions"), where("exam", "==", examName));
       const countSnap = await getDocs(countQuery);
       setCurrentExamCount(countSnap.size);
     } catch (e) {
       console.log("Count fetch error:", e);
+    }
+
+    // 🎯 FETCH SUBJECT-WISE TOTAL COUNTS (for each subject seen in this batch)
+    try {
+      const subjectTotals: Record<string, number> = {};
+      for (const subj of Array.from(subjectsSeen)) {
+        const subjQuery = query(
+          collection(db, "questions"),
+          where("exam", "==", examName),
+          where("subject", "==", subj)
+        );
+        const subjSnap = await getDocs(subjQuery);
+        subjectTotals[subj] = subjSnap.size;
+      }
+      setSubjectTotalInDb(subjectTotals);
+    } catch (e) {
+      console.log("Subject count fetch error:", e);
     }
 
     setUploading(false);
@@ -206,7 +243,7 @@ export default function BulkUploadPage() {
               <CheckCircle2 size={18} /> Upload Complete!
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 text-sm mb-4">
               <div className="bg-emerald-50 rounded-xl p-3">
                 <span className="text-[10px] text-emerald-600 font-bold uppercase block">Uploaded</span>
                 <span className="text-xl font-black text-emerald-700">{progress.total - skipped - duplicates}</span>
@@ -226,6 +263,32 @@ export default function BulkUploadPage() {
                 </span>
               </div>
             </div>
+
+            {/* 🎯 SUBJECT-WISE BREAKDOWN */}
+            {Object.keys(subjectUploadedThisBatch).length > 0 && (
+              <div className="border-t border-slate-100 pt-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-3">
+                  📚 Subject-wise Breakdown
+                </h3>
+                <div className="space-y-2">
+                  {Object.entries(subjectUploadedThisBatch).map(([subject, count]) => (
+                    <div
+                      key={subject}
+                      className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-2.5"
+                    >
+                      <span className="text-sm font-bold text-slate-700">{subject}</span>
+                      <div className="text-right">
+                        <span className="text-xs text-emerald-600 font-black">+{count} uploaded</span>
+                        <span className="text-xs text-slate-400 mx-1.5">|</span>
+                        <span className="text-xs text-blue-600 font-black">
+                          {subjectTotalInDb[subject] ?? "..."} total
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
