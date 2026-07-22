@@ -12,7 +12,7 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { UploadCloud, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { UploadCloud, CheckCircle2, XCircle, Loader2, Eye, Pencil } from "lucide-react";
 
 function shuffleOptions(array: string[]) {
   const arr = [...array];
@@ -25,6 +25,9 @@ function shuffleOptions(array: string[]) {
 
 export default function BulkUploadPage() {
   const [jsonInput, setJsonInput] = useState("");
+  const [parsedQuestions, setParsedQuestions] = useState<any[]>([]);
+  const [previewMode, setPreviewMode] = useState(false);
+
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [skipped, setSkipped] = useState(0);
@@ -32,21 +35,16 @@ export default function BulkUploadPage() {
   const [currentExamCount, setCurrentExamCount] = useState<number | null>(null);
   const [currentExamName, setCurrentExamName] = useState("");
 
-  // 🎯 SUBJECT-WISE STATS
   const [subjectUploadedThisBatch, setSubjectUploadedThisBatch] = useState<Record<string, number>>({});
   const [subjectTotalInDb, setSubjectTotalInDb] = useState<Record<string, number>>({});
 
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
-  const handleUpload = async () => {
+  // 🎯 STEP 1 — PARSE & PREVIEW
+  const handlePreview = () => {
     setError("");
     setDone(false);
-    setSkipped(0);
-    setDuplicates(0);
-    setCurrentExamCount(null);
-    setSubjectUploadedThisBatch({});
-    setSubjectTotalInDb({});
 
     let questions: any[] = [];
     try {
@@ -61,7 +59,30 @@ export default function BulkUploadPage() {
       return;
     }
 
+    setParsedQuestions(questions);
+    setPreviewMode(true);
+  };
+
+  // 🎯 EDIT ANSWER IN PREVIEW
+  const handleAnswerChange = (index: number, newAnswer: string) => {
+    const updated = [...parsedQuestions];
+    updated[index] = { ...updated[index], answer: newAnswer };
+    setParsedQuestions(updated);
+  };
+
+  // 🎯 EDIT ANY TEXT FIELD IN PREVIEW (question/options)
+  const handleFieldChange = (index: number, field: string, value: string) => {
+    const updated = [...parsedQuestions];
+    updated[index] = { ...updated[index], [field]: value };
+    setParsedQuestions(updated);
+  };
+
+  // 🎯 STEP 2 — CONFIRM & UPLOAD (after verification)
+  const handleConfirmUpload = async () => {
+    const questions = parsedQuestions;
+
     setUploading(true);
+    setPreviewMode(false);
     setProgress({ done: 0, total: questions.length });
 
     let uploadCount = 0;
@@ -70,9 +91,7 @@ export default function BulkUploadPage() {
     let examName = questions[0]?.exam || "";
     setCurrentExamName(examName);
 
-    // 🎯 Track uploaded count per subject (this batch)
     const subjectBatchCounts: Record<string, number> = {};
-    // 🎯 Track unique subjects seen in this batch (to fetch DB totals later)
     const subjectsSeen = new Set<string>();
 
     for (let i = 0; i < questions.length; i++) {
@@ -137,8 +156,6 @@ export default function BulkUploadPage() {
           createdAt: new Date().toISOString(),
         });
         uploadCount++;
-
-        // 🎯 Increment subject batch counter
         subjectBatchCounts[subjectKey] = (subjectBatchCounts[subjectKey] || 0) + 1;
       } catch (e) {
         console.log("Upload error for question", i, e);
@@ -152,7 +169,6 @@ export default function BulkUploadPage() {
     setDuplicates(dupCount);
     setSubjectUploadedThisBatch(subjectBatchCounts);
 
-    // 🎯 FETCH CURRENT TOTAL COUNT FOR THIS EXAM
     try {
       const countQuery = query(collection(db, "questions"), where("exam", "==", examName));
       const countSnap = await getDocs(countQuery);
@@ -161,7 +177,6 @@ export default function BulkUploadPage() {
       console.log("Count fetch error:", e);
     }
 
-    // 🎯 FETCH SUBJECT-WISE TOTAL COUNTS (for each subject seen in this batch)
     try {
       const subjectTotals: Record<string, number> = {};
       for (const subj of Array.from(subjectsSeen)) {
@@ -180,15 +195,121 @@ export default function BulkUploadPage() {
 
     setUploading(false);
     setDone(true);
+    setJsonInput("");
+    setParsedQuestions([]);
+  };
+
+  const handleBackToEdit = () => {
+    setPreviewMode(false);
   };
 
   const percent = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
+  // ==========================================
+  // 🎯 PREVIEW MODE UI
+  // ==========================================
+  if (previewMode) {
+    return (
+      <div className="min-h-screen bg-slate-50 py-10 px-4">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between mb-1">
+            <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+              <Eye size={22} className="text-blue-600" /> Preview & Verify
+            </h1>
+          </div>
+          <p className="text-slate-500 text-sm mb-6">
+            {parsedQuestions.length} questions mile. Answer galat lage to niche se badal do, phir Confirm & Upload dabao.
+          </p>
+
+          <div className="space-y-4 mb-6">
+            {parsedQuestions.map((q, index) => (
+              <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Q{index + 1} • {q.subject || "No Subject"}
+                  </span>
+                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase">
+                    {q.exam}
+                  </span>
+                </div>
+
+                <textarea
+                  value={q.questionEn || ""}
+                  onChange={(e) => handleFieldChange(index, "questionEn", e.target.value)}
+                  rows={2}
+                  className="w-full text-sm font-semibold text-slate-800 border border-slate-200 rounded-xl p-2.5 mb-3 outline-none focus:border-blue-400 resize-none"
+                />
+
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {["A", "B", "C", "D"].map((opt) => {
+                    const fieldName = `option${opt}`;
+                    const isCorrect = q.answer === opt;
+                    return (
+                      <div
+                        key={opt}
+                        className={`flex items-center gap-2 border rounded-xl px-3 py-2 ${
+                          isCorrect ? "border-emerald-400 bg-emerald-50" : "border-slate-200"
+                        }`}
+                      >
+                        <span className={`text-xs font-black ${isCorrect ? "text-emerald-600" : "text-slate-400"}`}>
+                          {opt}
+                        </span>
+                        <input
+                          value={q[fieldName] || ""}
+                          onChange={(e) => handleFieldChange(index, fieldName, e.target.value)}
+                          className="flex-1 text-xs font-medium bg-transparent outline-none text-slate-700"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                    <Pencil size={12} /> Correct Answer:
+                  </label>
+                  <select
+                    value={q.answer || "A"}
+                    onChange={(e) => handleAnswerChange(index, e.target.value)}
+                    className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                  >
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3 sticky bottom-4">
+            <button
+              onClick={handleBackToEdit}
+              className="flex-1 h-12 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-sm shadow-sm"
+            >
+              ← Back to Edit JSON
+            </button>
+            <button
+              onClick={handleConfirmUpload}
+              className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={16} /> Confirm & Upload ({parsedQuestions.length})
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 🎯 DEFAULT MODE UI (Paste JSON + Upload progress)
+  // ==========================================
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-black text-slate-900 mb-1">📤 Bulk Question Upload</h1>
-        <p className="text-slate-500 text-sm mb-6">JSON array paste karo neeche, aur Upload dabao.</p>
+        <p className="text-slate-500 text-sm mb-6">JSON array paste karo neeche, aur Preview dabao verify karne ke liye.</p>
 
         <textarea
           value={jsonInput}
@@ -205,28 +326,25 @@ export default function BulkUploadPage() {
           </div>
         )}
 
-        <button
-          onClick={handleUpload}
-          disabled={uploading || !jsonInput.trim()}
-          className={`w-full mt-4 flex items-center justify-center gap-2 h-12 rounded-xl font-bold text-sm text-white transition-all ${
-            uploading || !jsonInput.trim()
-              ? "bg-slate-300 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {uploading ? (
-            <>
-              <Loader2 size={16} className="animate-spin" /> Uploading {progress.done}/{progress.total}...
-            </>
-          ) : (
-            <>
-              <UploadCloud size={16} /> Upload Questions
-            </>
-          )}
-        </button>
+        {!uploading && (
+          <button
+            onClick={handlePreview}
+            disabled={!jsonInput.trim()}
+            className={`w-full mt-4 flex items-center justify-center gap-2 h-12 rounded-xl font-bold text-sm text-white transition-all ${
+              !jsonInput.trim()
+                ? "bg-slate-300 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            <Eye size={16} /> Preview & Verify Questions
+          </button>
+        )}
 
         {uploading && (
           <div className="mt-4">
+            <div className="flex items-center justify-center gap-2 text-blue-600 font-bold text-sm mb-2">
+              <Loader2 size={16} className="animate-spin" /> Uploading {progress.done}/{progress.total}...
+            </div>
             <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-blue-600 transition-all duration-200"
@@ -264,7 +382,6 @@ export default function BulkUploadPage() {
               </div>
             </div>
 
-            {/* 🎯 SUBJECT-WISE BREAKDOWN */}
             {Object.keys(subjectUploadedThisBatch).length > 0 && (
               <div className="border-t border-slate-100 pt-4">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-3">
