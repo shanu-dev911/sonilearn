@@ -229,10 +229,10 @@ export default function Dashboard() {
             </div>
             <div className="min-w-0">
               <div className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] tracking-wider font-black text-amber-700 uppercase">
-                <Zap size={10} /> Rapid Revision Engine
+                <Zap size={10} />Math/Reasoning
               </div>
               <h3 className="text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate">
-                   🎯 Warrior Questions
+                   🎯 Warrior battal Questions 
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs font-medium leading-normal">
                 Initiate a high-velocity -minute evaluation cycle for structural review.
