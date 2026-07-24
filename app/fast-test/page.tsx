@@ -43,6 +43,25 @@ const normalizeExamToDBFormat = (exam: string): string => {
     .replace(/\s+/g, "_");
 };
 
+// 🎯 WARRIOR MODE — only these subject names qualify as Math/Reasoning
+// (covers common naming variants used across uploaded question sets)
+const WARRIOR_SUBJECTS = [
+  "mathematics",
+  "quantitative aptitude",
+  "maths",
+  "math",
+  "reasoning",
+  "general intelligence and reasoning",
+  "general intelligence & reasoning",
+  "general awareness and reasoning",
+  "logical reasoning",
+];
+
+function isWarriorSubject(subject: string): boolean {
+  const s = (subject || "").trim().toLowerCase();
+  return WARRIOR_SUBJECTS.some((allowed) => s.includes(allowed) || allowed.includes(s));
+}
+
 export default function FastTestPage() {
   const router = useRouter();
   const [user, authLoading, authError] = useAuthState(auth);
@@ -64,7 +83,7 @@ export default function FastTestPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setError("Please log in to access the fast test.");
+      setError("Please log in to access Warrior Questions.");
       setLoading(false);
       return;
     }
@@ -104,7 +123,7 @@ export default function FastTestPage() {
   }, [user, authLoading, authError]);
 
   // =========================
-  // LOAD QUESTIONS
+  // LOAD QUESTIONS (Hard difficulty + Math/Reasoning only)
   // =========================
   useEffect(() => {
     if (!targetExam || authLoading || !user) return;
@@ -124,79 +143,75 @@ export default function FastTestPage() {
         let loadedQuestions: Question[] = [];
         const normalizedExam = normalizeExamToDBFormat(targetExam);
 
+        const buildQuestion = (docSnap: any, data: any): Question | null => {
+          if (!data.questionEn || !data.optionA || !data.optionB || !data.answer) return null;
+
+          // 🎯 HARD DIFFICULTY FILTER
+          const difficulty = (data.difficulty || "").toString().trim().toLowerCase();
+          if (difficulty !== "hard") return null;
+
+          // 🎯 MATH / REASONING SUBJECT FILTER
+          const subject = data.subject || data.topic || "";
+          if (!isWarriorSubject(subject)) return null;
+
+          const correctAnswer = data[`option${data.answer}`] || "";
+          const optionsEn = [data.optionA, data.optionB, data.optionC, data.optionD].filter(Boolean);
+          const optionsHi = [
+            data.optionAHi || data.optionA,
+            data.optionBHi || data.optionB,
+            data.optionCHi || data.optionC,
+            data.optionDHi || data.optionD,
+          ].filter(Boolean);
+
+          return {
+            id: docSnap.id,
+            questionEn: data.questionEn,
+            questionHi: data.questionHi || "",
+            optionsEn,
+            optionsHi,
+            options: optionsEn,
+            answer: correctAnswer,
+            explanationEn: data.explanationEn || "",
+            explanationHi: data.explanationHi || "",
+            topic: data.subject || data.topic || "General Assessment",
+            exam: data.exam,
+          };
+        };
+
         try {
-          const q = query(questionsRef, where("exam", "==", normalizedExam), limit(25));
+          const q = query(
+            questionsRef,
+            where("exam", "==", normalizedExam),
+            where("difficulty", "==", "hard"),
+            limit(100)
+          );
           const querySnapshot = await getDocs(q);
 
-          if (querySnapshot.size > 0) {
-            querySnapshot.forEach((docSnap) => {
-              const data = docSnap.data();
-              if (data.questionEn && data.optionA && data.optionB && data.answer) {
-                const correctAnswer = data[`option${data.answer}`] || "";
-                const optionsEn = [data.optionA, data.optionB, data.optionC, data.optionD].filter(Boolean);
-                const optionsHi = [
-                  data.optionAHi || data.optionA,
-                  data.optionBHi || data.optionB,
-                  data.optionCHi || data.optionC,
-                  data.optionDHi || data.optionD,
-                ].filter(Boolean);
-
-                loadedQuestions.push({
-                  id: docSnap.id,
-                  questionEn: data.questionEn,
-                  questionHi: data.questionHi || "",
-                  optionsEn,
-                  optionsHi,
-                  options: optionsEn,
-                  answer: correctAnswer,
-                  explanationEn: data.explanationEn || "",
-                  explanationHi: data.explanationHi || "",
-                  topic: data.subject || data.topic || "General Assessment",
-                  exam: data.exam,
-                });
-              }
-            });
-          }
+          querySnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const built = buildQuestion(docSnap, data);
+            if (built) loadedQuestions.push(built);
+          });
         } catch (queryError) {
           console.warn("Query failed, fallback execution sequence activated.");
         }
 
         // Fallback Filter Mechanism
         if (loadedQuestions.length === 0) {
-          const allQuestionsSnapshot = await getDocs(query(questionsRef, limit(200)));
+          const allQuestionsSnapshot = await getDocs(query(questionsRef, limit(500)));
           allQuestionsSnapshot.forEach((docSnap) => {
             const data = docSnap.data();
             const dbExamNormalized = normalizeExamToDBFormat(data.exam || "");
 
-            if (dbExamNormalized === normalizedExam && data.questionEn && data.optionA && data.optionB && data.answer) {
-              const correctAnswer = data[`option${data.answer}`] || "";
-              const optionsEn = [data.optionA, data.optionB, data.optionC, data.optionD].filter(Boolean);
-              const optionsHi = [
-                data.optionAHi || data.optionA,
-                data.optionBHi || data.optionB,
-                data.optionCHi || data.optionC,
-                data.optionDHi || data.optionD,
-              ].filter(Boolean);
-
-              loadedQuestions.push({
-                id: docSnap.id,
-                questionEn: data.questionEn,
-                questionHi: data.questionHi || "",
-                optionsEn,
-                optionsHi,
-                options: optionsEn,
-                answer: correctAnswer,
-                explanationEn: data.explanationEn || "",
-                explanationHi: data.explanationHi || "",
-                topic: data.subject || data.topic || "General Assessment",
-                exam: data.exam,
-              });
+            if (dbExamNormalized === normalizedExam) {
+              const built = buildQuestion(docSnap, data);
+              if (built) loadedQuestions.push(built);
             }
           });
         }
 
         if (loadedQuestions.length === 0) {
-          setError(`No questions currently available for ${targetExam}. Verify repository.`);
+          setError(`No Warrior (Hard Math/Reasoning) questions currently available for ${targetExam}.`);
           setQuestions([]);
           return;
         }
@@ -277,7 +292,7 @@ export default function FastTestPage() {
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-xs font-bold uppercase tracking-widest text-slate-400">
-            {isSubmitting ? "Syncing Weak Assessment Telemetry..." : "Assembling Fast Test Matrix..."}
+            {isSubmitting ? "Syncing Weak Assessment Telemetry..." : "Assembling Warrior Question Matrix..."}
           </p>
         </div>
       </div>
@@ -305,7 +320,7 @@ export default function FastTestPage() {
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl mx-auto mb-3 border border-blue-100 shadow-sm">🎉</div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">Assessment Concluded</h1>
-            <p className="text-slate-400 text-xs mt-0.5 font-bold uppercase tracking-wider">Fast Evaluation Profile Sync Complete</p>
+            <p className="text-slate-400 text-xs mt-0.5 font-bold uppercase tracking-wider">Warrior Questions Sync Complete</p>
           </div>
 
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mb-6 text-center border border-slate-200/60">
@@ -340,7 +355,7 @@ export default function FastTestPage() {
         <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <button onClick={() => router.back()} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-xs font-bold uppercase tracking-wider"><ArrowLeft size={16} /> Quit</button>
           <div className="text-center">
-            <span className="text-[9px] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded text-blue-600 font-black tracking-widest uppercase block w-max mx-auto">{targetExam}</span>
+            <span className="text-[9px] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-amber-700 font-black tracking-widest uppercase block w-max mx-auto">⚡ {targetExam}</span>
             <h1 className="text-sm font-black text-slate-800 uppercase tracking-tight mt-1">Item {currentQuestion + 1} / {questions.length}</h1>
           </div>
           <div className="text-right">
@@ -348,14 +363,17 @@ export default function FastTestPage() {
             <span className="text-base font-black text-blue-600 tracking-tight block mt-0.5">{score}</span>
           </div>
         </div>
-        <div className="h-1 w-full bg-slate-100"><div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} /></div>
+        <div className="h-1 w-full bg-slate-100"><div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} /></div>
       </header>
 
       {/* COMPONENT BODY */}
       <main className="max-w-2xl mx-auto px-4 mt-6 space-y-4">
 
         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-          <div className="flex items-center mb-5"><span className="bg-slate-50 border text-slate-500 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wide">Category: {currentQ?.topic}</span></div>
+          <div className="flex items-center mb-5 gap-2">
+            <span className="bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wide">🔥 Hard</span>
+            <span className="bg-slate-50 border text-slate-500 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wide">Category: {currentQ?.topic}</span>
+          </div>
 
           {/* QUESTION BOX */}
           <div className="space-y-4 mb-8">

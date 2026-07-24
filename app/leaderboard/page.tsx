@@ -24,6 +24,15 @@ interface LeaderboardEntry {
     score: number;
     accuracy: number;
     rank: number;
+    attempts: number;
+}
+
+interface BestUserEntry {
+    userId: string;
+    displayName: string;
+    score: number;
+    accuracy: number;
+    attempts: number;
 }
 
 export default function LeaderboardPage() {
@@ -53,7 +62,7 @@ export default function LeaderboardPage() {
             collection(db, "exam_results"),
             orderBy("score", "desc"),
             orderBy("createdAt", "desc"),
-            limit(500)
+            limit(2000)
         );
 
         const unsubSnapshot = onSnapshot(
@@ -65,13 +74,15 @@ export default function LeaderboardPage() {
                 const currentUserId =
                     currentUserRef.current?.uid || null;
 
-                const allEntries: LeaderboardEntry[] = [];
+                // STEP 1 — Collect ALL valid attempts (raw)
+                const rawEntries: {
+                    userId: string;
+                    displayName: string;
+                    score: number;
+                    accuracy: number;
+                }[] = [];
 
-                const scores: number[] = [];
-
-                let foundUser: LeaderboardEntry | null = null;
-
-                snap.docs.forEach((d, index) => {
+                snap.docs.forEach((d) => {
 
                     const res = d.data();
 
@@ -103,49 +114,74 @@ export default function LeaderboardPage() {
                         100
                     );
 
-                    const entry: LeaderboardEntry = {
-                        id: d.id,
-
+                    rawEntries.push({
                         userId: rawUserId,
-
                         displayName: rawDisplayName,
-
                         score: Number(res.score || 0),
-
                         accuracy,
-
-                        rank: allEntries.length + 1,
-                    };
-
-                    allEntries.push(entry);
-
-                    scores.push(entry.score);
-
-                    if (
-                        currentUserId &&
-                        rawUserId === currentUserId &&
-                        !foundUser
-                    ) {
-                        foundUser = entry;
-                    }
+                    });
 
                 });
 
-                // CUTOFF
-                if (scores.length > 0) {
+                // STEP 2 — Keep only BEST score per unique user
+                const bestPerUser: Record<string, BestUserEntry> = {};
 
-                    const sorted = [...scores].sort(
-                        (a, b) => b - a
-                    );
+                rawEntries.forEach((entry) => {
+                    const existing = bestPerUser[entry.userId];
 
-                    const idx = Math.min(
-                        Math.floor(sorted.length * 0.3),
-                        sorted.length - 1
-                    );
+                    if (!existing) {
+                        bestPerUser[entry.userId] = {
+                            ...entry,
+                            attempts: 1,
+                        };
+                    } else {
+                        existing.attempts += 1;
+                        if (entry.score > existing.score) {
+                            existing.score = entry.score;
+                            existing.accuracy = entry.accuracy;
+                            existing.displayName = entry.displayName;
+                        }
+                    }
+                });
 
-                    setCutoff(sorted[idx]);
+                // STEP 3 — Sort unique users by best score, assign ranks
+                const uniqueLeaderboard = Object.values(bestPerUser).sort(
+                    (a, b) => b.score - a.score
+                );
+
+                const allEntries: LeaderboardEntry[] = uniqueLeaderboard.map(
+                    (entry, index) => ({
+                        id: entry.userId,
+                        userId: entry.userId,
+                        displayName: entry.displayName,
+                        score: entry.score,
+                        accuracy: entry.accuracy,
+                        attempts: entry.attempts,
+                        rank: index + 1,
+                    })
+                );
+
+                let foundUser: LeaderboardEntry | null = null;
+
+                if (currentUserId) {
+                    foundUser =
+                        allEntries.find((e) => e.userId === currentUserId) || null;
                 }
 
+                // CUTOFF (based on unique users' best scores)
+                if (allEntries.length > 0) {
+
+                    const scores = allEntries.map((e) => e.score);
+
+                    const idx = Math.min(
+                        Math.floor(scores.length * 0.3),
+                        scores.length - 1
+                    );
+
+                    setCutoff(scores[idx]);
+                }
+
+                // Total unique students (not total attempts)
                 setTotalCount(allEntries.length);
 
                 setData(allEntries.slice(0, 50));
@@ -175,7 +211,6 @@ export default function LeaderboardPage() {
     const userInTop50 =
         userRank !== null && userRank.rank <= 50;
 
-    // LOADING
     if (loading) {
 
         return (
@@ -196,10 +231,8 @@ export default function LeaderboardPage() {
 
         <div className="min-h-screen bg-slate-50 pb-32">
 
-            {/* HEADER */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 px-5 pt-14 pb-10 text-center relative">
 
-                {/* BACK BUTTON */}
                 <button
                     onClick={() => router.back()}
                     className="absolute left-5 top-14 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-95 transition"
@@ -217,7 +250,6 @@ export default function LeaderboardPage() {
 
             </div>
 
-            {/* USER CARD */}
             <div className="px-4 -mt-6">
 
                 {userRank ? (
@@ -231,7 +263,6 @@ export default function LeaderboardPage() {
                             }`}
                     >
 
-                        {/* LEFT */}
                         <div className="flex items-center gap-4">
 
                             <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center font-black text-2xl">
@@ -245,14 +276,13 @@ export default function LeaderboardPage() {
                                 </p>
 
                                 <p className="text-xs text-white/70 font-semibold">
-                                    {userRank.accuracy}% accuracy
+                                    {userRank.accuracy}% accuracy • {userRank.attempts} attempt{userRank.attempts > 1 ? "s" : ""}
                                 </p>
 
                             </div>
 
                         </div>
 
-                        {/* RIGHT */}
                         <div className="text-right">
 
                             <p className="text-3xl font-black">
@@ -260,7 +290,7 @@ export default function LeaderboardPage() {
                             </p>
 
                             <p className="text-[10px] uppercase tracking-widest text-white/60 font-bold">
-                                points
+                                best score
                             </p>
 
                             <div
@@ -294,7 +324,6 @@ export default function LeaderboardPage() {
 
             </div>
 
-            {/* STATS */}
             <div className="grid grid-cols-2 gap-4 px-4 mt-5">
 
                 <div className="bg-white rounded-[2rem] p-5 border shadow-sm text-center">
@@ -339,7 +368,6 @@ export default function LeaderboardPage() {
 
             </div>
 
-            {/* TITLE */}
             <div className="px-5 mt-8 mb-3">
 
                 <h2 className="text-lg font-black text-gray-800">
@@ -348,7 +376,6 @@ export default function LeaderboardPage() {
 
             </div>
 
-            {/* LIST */}
             <div className="px-4 space-y-3">
 
                 {data.length === 0 ? (
@@ -389,7 +416,6 @@ export default function LeaderboardPage() {
                                     }`}
                             >
 
-                                {/* LEFT */}
                                 <div className="flex items-center gap-4">
 
                                     <div
@@ -429,14 +455,13 @@ export default function LeaderboardPage() {
                                         </p>
 
                                         <p className="text-[11px] text-gray-400 font-semibold mt-1">
-                                            {u.accuracy}% accuracy
+                                            {u.accuracy}% accuracy • {u.attempts} attempt{u.attempts > 1 ? "s" : ""}
                                         </p>
 
                                     </div>
 
                                 </div>
 
-                                {/* RIGHT */}
                                 <div className="text-right">
 
                                     <p className="text-2xl font-black text-gray-800">
@@ -474,7 +499,6 @@ export default function LeaderboardPage() {
 
             </div>
 
-            {/* STICKY BAR */}
             {userRank && !userInTop50 && (
 
                 <div className="fixed bottom-20 left-4 right-4 max-w-xl mx-auto bg-slate-900 text-white rounded-[2rem] p-4 flex items-center justify-between shadow-2xl z-50">
