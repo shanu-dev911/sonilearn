@@ -30,7 +30,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
-import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, HelpCircle } from "lucide-react";
+import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, BookOpen } from "lucide-react";
 
 interface Question {
   id: string;
@@ -41,26 +41,42 @@ interface Question {
   optionsEn?: string[];
   optionsHi?: string[];
   answer: string;
-  examName?: string; // Target track verification identifier
+  examName?: string;
   topic?: string;
 }
 
 type Phase =
   | "loading"
+  | "subject-select"
   | "quiz"
   | "submitting"
   | "result";
 
-// =========================
-// PREMIUM METRIC CONFIGURATIONS
-// =========================
-const TOTAL_QUESTIONS = 30; // 🎯 30 Questions Locked
-const TIMER_SECONDS = 10 * 60; // ⏱️ 10 Minutes Calibration
+const TOTAL_QUESTIONS = 30;
+const TIMER_SECONDS = 10 * 60;
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// 🎯 RUNTIME SAFETY SHUFFLE — ensures options are always randomized fresh,
+// regardless of how they were stored in the database. This guarantees the
+// correct answer position is never predictable (e.g. never always "A").
+function shuffleQuestionOptions(optEn: string[], optHi: string[], correctIndex: number) {
+  const indices = [0, 1, 2, 3];
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  const newOptEn = indices.map((idx) => optEn[idx]);
+  const newOptHi = indices.map((idx) => optHi[idx]);
+  const newCorrectIndex = indices.indexOf(correctIndex);
+  const newCorrectText = newOptEn[newCorrectIndex];
+
+  return { newOptEn, newOptHi, newCorrectText };
 }
 
 export default function DailyChallengePage() {
@@ -74,6 +90,10 @@ export default function DailyChallengePage() {
   const [error, setError] = useState("");
   const [targetExam, setTargetExam] = useState("");
   const [user, authLoading, authError] = useAuthState(auth);
+
+  // 🎯 SUBJECT SELECTION STATE
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState("");
 
   const normalizeTargetExam = (exam: string) => {
     const cleaned = exam.trim();
@@ -90,7 +110,6 @@ export default function DailyChallengePage() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Hook state tracking placement rule executed
   const q = useMemo(() => {
     return (
       questions[current] || {
@@ -102,8 +121,6 @@ export default function DailyChallengePage() {
         optionsEn: [],
         optionsHi: [],
         answer: "",
-        explanationEn: "",
-        explanationHi: "",
         examName: targetExam,
         topic: ""
       }
@@ -157,96 +174,153 @@ export default function DailyChallengePage() {
     return () => unsubscribe();
   }, [user, authLoading, authError]);
 
-  // ENGINE RESOLUTION: QUESTIONS RETRIEVAL LAYER
+  // 🎯 STEP 1 — FETCH AVAILABLE SUBJECTS FOR THIS EXAM
   useEffect(() => {
     if (!targetExam) return;
 
-    async function loadQuestions() {
+    async function loadSubjects() {
       try {
-        setPhase("loading");
         setError("");
-        setQuestions([]);
-        setAnswers([]);
-        setCurrent(0);
-        setTimeLeft(TIMER_SECONDS);
 
         const examFilters = normalizeTargetExam(targetExam);
 
-        // Mix dataset optimization retrieval logic
         const snap = await getDocs(
           query(
             collection(db, "questions"),
             where("exam", "in", examFilters),
-            limit(100) // Excess metrics requested for optimization layout shuffling
+            limit(500)
           )
         );
 
-        let arr: Question[] = [];
-
+        const subjectSet = new Set<string>();
         snap.forEach((d) => {
           const data: any = d.data();
-          const answerKey = data.answer?.toString().toUpperCase();
-          const answerValue = data["option" + answerKey] || "";
-
-          // Bi-lingual language variables safe string deployment
-          const primaryText = data.questionEn || data.question || "";
-
-          if (
-            primaryText &&
-            data.optionA &&
-            data.optionB &&
-            data.optionC &&
-            data.optionD &&
-            answerValue
-          ) {
-            const optionsEn = [data.optionA || "", data.optionB || "", data.optionC || "", data.optionD || ""];
-            const optionsHi = [
-              data.optionAHi || data.optionA || "",
-              data.optionBHi || data.optionB || "",
-              data.optionCHi || data.optionC || "",
-              data.optionDHi || data.optionD || "",
-            ];
-
-            arr.push({
-              id: d.id,
-              question: primaryText,
-              questionEn: primaryText,
-              questionHi: data.questionHi || data.questionHindi || "",
-              options: optionsEn,
-              optionsEn,
-              optionsHi,
-              answer: answerValue,
-              examName: data.exam || targetExam,
-              topic: data.subject || data.topic || targetExam,
-            });
-          }
+          const subj = data.subject || data.topic;
+          if (subj) subjectSet.add(subj);
         });
 
-        // Maximum random dispersion deployment architecture rule
-        arr = arr
-          .sort(() => Math.random() - 0.5)
-          .slice(0, TOTAL_QUESTIONS);
+        const subjectList = Array.from(subjectSet).sort();
 
-        if (arr.length === 0) {
-          setError(`No target evaluation entries resolved for profile metadata: ${targetExam}.`);
+        if (subjectList.length === 0) {
+          setError(`No subjects found for ${targetExam}.`);
           setPhase("result");
           return;
         }
 
-        setQuestions(arr);
-        setAnswers(new Array(arr.length).fill(""));
-        setPhase("quiz");
+        setAvailableSubjects(subjectList);
+        setPhase("subject-select");
       } catch (err) {
         console.error(err);
-        setError("Critical framework exception parsing standard database vectors.");
+        setError("Failed to load subjects.");
         setPhase("result");
       }
     }
 
-    loadQuestions();
+    loadSubjects();
   }, [targetExam]);
 
-  // MASTER TIMER REGULATION CONTROLLER
+  // 🎯 STEP 2 — LOAD QUESTIONS FOR SELECTED SUBJECT (with runtime verification + reshuffle)
+  const startQuizForSubject = async (subject: string) => {
+    try {
+      setSelectedSubject(subject);
+      setPhase("loading");
+      setError("");
+      setQuestions([]);
+      setAnswers([]);
+      setCurrent(0);
+      setTimeLeft(TIMER_SECONDS);
+
+      const examFilters = normalizeTargetExam(targetExam);
+
+      const snap = await getDocs(
+        query(
+          collection(db, "questions"),
+          where("exam", "in", examFilters),
+          where("subject", "==", subject),
+          limit(150)
+        )
+      );
+
+      let arr: Question[] = [];
+
+      snap.forEach((d) => {
+        const data: any = d.data();
+        const answerKey = data.answer?.toString().toUpperCase();
+
+        // 🎯 VERIFICATION — every question must have a valid answer key mapping
+        // to one of the 4 options. If mapping is broken, question is skipped
+        // entirely rather than shown with a wrong/blank answer.
+        const optionMap: Record<string, string> = {
+          A: data.optionA,
+          B: data.optionB,
+          C: data.optionC,
+          D: data.optionD,
+        };
+        const answerValue = optionMap[answerKey];
+
+        const primaryText = data.questionEn || data.question || "";
+
+        const allOptionsPresent =
+          data.optionA && data.optionB && data.optionC && data.optionD;
+
+        if (!primaryText || !allOptionsPresent || !answerValue) {
+          // Invalid/incomplete question — skip, never show to user
+          return;
+        }
+
+        const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD];
+        const rawOptHi = [
+          data.optionAHi || data.optionA,
+          data.optionBHi || data.optionB,
+          data.optionCHi || data.optionC,
+          data.optionDHi || data.optionD,
+        ];
+
+        const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
+
+        // 🎯 RUNTIME RESHUFFLE — options re-randomized fresh every load,
+        // so the correct answer position is never predictable/patterned.
+        const { newOptEn, newOptHi, newCorrectText } = shuffleQuestionOptions(
+          rawOptEn,
+          rawOptHi,
+          correctIndex
+        );
+
+        arr.push({
+          id: d.id,
+          question: primaryText,
+          questionEn: primaryText,
+          questionHi: data.questionHi || data.questionHindi || "",
+          options: newOptEn,
+          optionsEn: newOptEn,
+          optionsHi: newOptHi,
+          answer: newCorrectText,
+          examName: data.exam || targetExam,
+          topic: data.subject || data.topic || targetExam,
+        });
+      });
+
+      arr = arr
+        .sort(() => Math.random() - 0.5)
+        .slice(0, TOTAL_QUESTIONS);
+
+      if (arr.length === 0) {
+        setError(`No verified questions found for ${subject} in ${targetExam}.`);
+        setPhase("result");
+        return;
+      }
+
+      setQuestions(arr);
+      setAnswers(new Array(arr.length).fill(""));
+      setPhase("quiz");
+    } catch (err) {
+      console.error(err);
+      setError("Critical framework exception parsing standard database vectors.");
+      setPhase("result");
+    }
+  };
+
+  // MASTER TIMER
   useEffect(() => {
     if (phase !== "quiz") return;
 
@@ -280,7 +354,6 @@ export default function DailyChallengePage() {
     }
   };
 
-  // FINAL METRIC COMMIT OPERATION
   const finishTest = async () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setPhase("submitting");
@@ -301,6 +374,7 @@ export default function DailyChallengePage() {
         score: finalScore,
         total: questions.length,
         examTrack: targetExam,
+        subject: selectedSubject,
         createdAt: serverTimestamp(),
       });
 
@@ -340,19 +414,64 @@ export default function DailyChallengePage() {
     setPhase("result");
   };
 
-  // UI LOADER STATE DESIGN
+  // LOADING
   if (phase === "loading") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
         <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
-          Calibrating 30 Challenge Nodes...
+          Calibrating Challenge Nodes...
         </p>
       </div>
     );
   }
 
-  // UI COMMITMENT TRANSACTION STATE DESIGN
+  // 🎯 SUBJECT SELECTION SCREEN
+  if (phase === "subject-select") {
+    return (
+      <div className="min-h-screen bg-slate-50/50 pb-32">
+        <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
+          <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition flex-shrink-0"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                Daily Challenge
+              </span>
+              <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
+                {targetExam}
+              </h1>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-2xl mx-auto px-4 mt-8">
+          <h2 className="text-xl font-black text-slate-900 mb-1">Choose a Subject</h2>
+          <p className="text-slate-500 text-sm mb-6">Ek subject select karo, 30 verified questions milenge practice ke liye.</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {availableSubjects.map((subject) => (
+              <button
+                key={subject}
+                onClick={() => startQuizForSubject(subject)}
+                className="bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 text-left shadow-sm hover:shadow-md transition-all flex items-center gap-3 group"
+              >
+                <div className="bg-blue-50 text-blue-600 p-2.5 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all">
+                  <BookOpen size={18} />
+                </div>
+                <span className="font-bold text-sm text-slate-800">{subject}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (phase === "submitting") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
@@ -364,7 +483,6 @@ export default function DailyChallengePage() {
     );
   }
 
-  // PLATFORM RESULTS INTERFACE LAYOUT
   if (phase === "result") {
     if (error) {
       return (
@@ -400,7 +518,7 @@ export default function DailyChallengePage() {
             Assessment Concluded
           </h1>
           <p className="text-slate-400 mt-1 text-xs font-medium">
-            Daily performance index for <span className="font-bold text-slate-700">{targetExam}</span> recorded.
+            {selectedSubject} performance for <span className="font-bold text-slate-700">{targetExam}</span> recorded.
           </p>
 
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mt-6 flex items-center justify-between">
@@ -415,28 +533,34 @@ export default function DailyChallengePage() {
             </div>
           </div>
 
-          <button
-            onClick={() => (window.location.href = "/leaderboard")}
-            className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-xs shadow-md transition-all uppercase tracking-wider"
-          >
-            Review National Placement Grid
-          </button>
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => setPhase("subject-select")}
+              className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 h-12 rounded-xl font-bold text-xs shadow-sm transition-all uppercase tracking-wider"
+            >
+              Try Another Subject
+            </button>
+            <button
+              onClick={() => (window.location.href = "/leaderboard")}
+              className="flex-1 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-xs shadow-md transition-all uppercase tracking-wider"
+            >
+              Leaderboard
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // SYSTEM TEST ENVIRONMENT INTERFACE LAYOUT
+  // QUIZ SCREEN
   return (
     <div className="min-h-screen bg-slate-50/50 pb-32 antialiased text-slate-900 selection:bg-blue-600 selection:text-white">
 
-      {/* BRAND INTERFACE APP BAR */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {/* BACK BUTTON */}
             <button
-              onClick={() => router.back()}
+              onClick={() => setPhase("subject-select")}
               className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition flex-shrink-0"
             >
               <ArrowLeft size={16} />
@@ -444,13 +568,12 @@ export default function DailyChallengePage() {
 
             <div>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                SoniLearn Core Engine
+                {selectedSubject}
               </span>
-              {/* 🎯 USER TRACK IDENTIFIER: Dynamic verification badge */}
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                 <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
-                  Challenge: {targetExam}
+                  {targetExam}
                 </h1>
               </div>
             </div>
@@ -462,7 +585,6 @@ export default function DailyChallengePage() {
           </div>
         </div>
 
-        {/* LINEAR HORIZONTAL PROGRESS TRACK */}
         <div className="h-1 w-full bg-slate-100 relative">
           <div
             className="h-full bg-blue-600 transition-all duration-300 rounded-r"
@@ -473,16 +595,14 @@ export default function DailyChallengePage() {
 
       <main className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
 
-        {/* ITEM SELECTION PIPELINE CARD */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                Matrix Node {current + 1} of {questions.length}
+                Question {current + 1} of {questions.length}
               </span>
-              {/* 🎯 CURRENT ITEM EXAM BADGE: Informs user which exam question belongs to */}
               <span className="inline-block mt-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-md text-[10px] font-black px-2 py-0.5 uppercase tracking-wide">
-                Target: {q.examName || targetExam} Verification
+                {selectedSubject}
               </span>
             </div>
             <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
@@ -491,7 +611,6 @@ export default function DailyChallengePage() {
             </div>
           </div>
 
-          {/* BILINGUAL QUESTION SECTION */}
           <div className="mb-6">
             <h2 className="text-xl font-black leading-relaxed text-slate-900 tracking-tight mb-4">
               {q.questionEn || q.question}
@@ -506,7 +625,6 @@ export default function DailyChallengePage() {
             )}
           </div>
 
-          {/* BILINGUAL OPTIONS SELECTION WRAPPER */}
           <div className="space-y-3">
             {q.optionsEn.map((optEn: string, i: number) => {
               const optHi = q.optionsHi?.[i] || "";
@@ -543,7 +661,6 @@ export default function DailyChallengePage() {
             })}
           </div>
 
-          {/* INTERACTIVE CONTROLS BOUNDARY */}
           <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-3">
             {current > 0 && (
               <button
@@ -574,7 +691,6 @@ export default function DailyChallengePage() {
           </div>
         </div>
 
-        {/* COMPREHENSIVE SEGMENT INTERACTIVE PALETTE */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-3.5">
             Deployment Matrix Map
