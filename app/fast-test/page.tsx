@@ -4,23 +4,19 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Clock3, Flame, Trophy, CheckCircle2, XCircle, BookOpen, RotateCcw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, RotateCcw, Timer, Flag, ArrowRight } from "lucide-react";
 import {
   collection,
   doc,
   getDocs,
-  limit,
   onSnapshot,
   query,
   where,
   addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase-client";
 import { useAuthState } from "react-firebase-hooks/auth";
-
-// =========================
-// TYPES
-// =========================
 
 type Question = {
   id: string;
@@ -28,23 +24,26 @@ type Question = {
   questionHi: string;
   optionsEn: string[];
   optionsHi: string[];
-  options: string[];
   answer: string;
   explanationEn?: string;
   explanationHi?: string;
-  topic?: string;
-  exam?: string;
+  subject?: string;
 };
 
-const normalizeExamToDBFormat = (exam: string): string => {
-  return exam
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
+type Phase = "loading" | "subject-select" | "quiz" | "submitting" | "result";
+
+const TOTAL_QUESTIONS = 30;
+const TIMER_SECONDS = 30 * 60; // 30 minutes
+
+const normalizeExam = (exam: string) => {
+  const cleaned = exam.trim();
+  const underscored = cleaned.replace(/\s+/g, "_");
+  return Array.from(
+    new Set([cleaned, underscored, underscored.toUpperCase(), underscored.toLowerCase()])
+  );
 };
 
-// 🎯 WARRIOR MODE — only these subject names qualify as Math/Reasoning
-// (covers common naming variants used across uploaded question sets)
+// 🎯 WARRIOR MODE — only Math/Reasoning subject variants qualify
 const WARRIOR_SUBJECTS = [
   "mathematics",
   "quantitative aptitude",
@@ -53,7 +52,6 @@ const WARRIOR_SUBJECTS = [
   "reasoning",
   "general intelligence and reasoning",
   "general intelligence & reasoning",
-  "general awareness and reasoning",
   "logical reasoning",
 ];
 
@@ -62,390 +60,553 @@ function isWarriorSubject(subject: string): boolean {
   return WARRIOR_SUBJECTS.some((allowed) => s.includes(allowed) || allowed.includes(s));
 }
 
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// 🎯 RUNTIME RESHUFFLE — fresh randomization every load, no predictable answer pattern
+function shuffleOptions(optEn: string[], optHi: string[], correctIndex: number) {
+  const indices = [0, 1, 2, 3];
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  const newOptEn = indices.map((idx) => optEn[idx]);
+  const newOptHi = indices.map((idx) => optHi[idx]);
+  const newCorrectIndex = indices.indexOf(correctIndex);
+  return { newOptEn, newOptHi, newCorrectText: newOptEn[newCorrectIndex] };
+}
+
 export default function FastTestPage() {
   const router = useRouter();
-  const [user, authLoading, authError] = useAuthState(auth);
+  const [user, authLoading] = useAuthState(auth);
+
+  const [phase, setPhase] = useState<Phase>("loading");
+  const [targetExam, setTargetExam] = useState("");
+  const [error, setError] = useState("");
+
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState("");
 
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [current, setCurrent] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
   const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
-  const [targetExam, setTargetExam] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [wrongQuestionTracker, setWrongQuestionTracker] = useState<Question[]>([]);
 
-  // =========================
   // LOAD TARGET EXAM
-  // =========================
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       setError("Please log in to access Warrior Questions.");
-      setLoading(false);
+      setPhase("result");
       return;
     }
 
-    const userDocRef = doc(db, "users", user.uid);
-    const unsubscribe = onSnapshot(
-      userDocRef,
-      (docSnap) => {
-        if (!docSnap.exists()) {
-          setError("User profile not found. Please set up your profile.");
-          setQuestions([]);
-          setTargetExam(null);
-          setLoading(false);
+    const userRef = doc(db, "users", user.uid);
+    const unsub = onSnapshot(
+      userRef,
+      (snap) => {
+        if (!snap.exists()) {
+          setError("User profile not found.");
+          setPhase("result");
           return;
         }
-
-        const userData = docSnap.data();
-        const exam = userData?.targetExam?.trim();
+        const exam = snap.data()?.targetExam?.trim();
         if (!exam) {
-          setError("Target exam not set. Please update your profile with your target exam.");
-          setQuestions([]);
-          setTargetExam(null);
-          setLoading(false);
+          setError("Target exam not set. Please update your profile.");
+          setPhase("result");
           return;
         }
-
         setTargetExam(exam);
-        setError("");
       },
-      (error) => {
-        setError("Unable to load your profile. Please try again.");
-        setLoading(false);
+      () => {
+        setError("Unable to load your profile.");
+        setPhase("result");
       }
     );
 
-    return () => unsubscribe();
-  }, [user, authLoading, authError]);
+    return () => unsub();
+  }, [user, authLoading]);
 
-  // =========================
-  // LOAD QUESTIONS (Hard difficulty + Math/Reasoning only)
-  // =========================
+  // STEP 1 — FIND AVAILABLE MATH/REASONING SUBJECTS FOR THIS EXAM (hard only)
   useEffect(() => {
-    if (!targetExam || authLoading || !user) return;
+    if (!targetExam) return;
 
-    const loadQuestionsFromFirebase = async () => {
+    async function loadSubjects() {
       try {
-        setLoading(true);
         setError("");
-        setQuestions([]);
-        setCurrentQuestion(0);
-        setSelectedOption(null);
-        setScore(0);
-        setFinished(false);
-        setWrongQuestionTracker([]);
+        const examFilters = normalizeExam(targetExam);
 
-        const questionsRef = collection(db, "questions");
-        let loadedQuestions: Question[] = [];
-        const normalizedExam = normalizeExamToDBFormat(targetExam);
+        const snap = await getDocs(
+          query(
+            collection(db, "questions"),
+            where("exam", "in", examFilters),
+            where("difficulty", "==", "hard")
+          )
+        );
 
-        const buildQuestion = (docSnap: any, data: any): Question | null => {
-          if (!data.questionEn || !data.optionA || !data.optionB || !data.answer) return null;
+        const subjectSet = new Set<string>();
+        snap.forEach((d) => {
+          const data: any = d.data();
+          const subj = data.subject || data.topic || "";
+          if (isWarriorSubject(subj)) {
+            subjectSet.add(subj);
+          }
+        });
 
-          // 🎯 HARD DIFFICULTY FILTER
-          const difficulty = (data.difficulty || "").toString().trim().toLowerCase();
-          if (difficulty !== "hard") return null;
+        const subjectList = Array.from(subjectSet).sort();
 
-          // 🎯 MATH / REASONING SUBJECT FILTER
-          const subject = data.subject || data.topic || "";
-          if (!isWarriorSubject(subject)) return null;
-
-          const correctAnswer = data[`option${data.answer}`] || "";
-          const optionsEn = [data.optionA, data.optionB, data.optionC, data.optionD].filter(Boolean);
-          const optionsHi = [
-            data.optionAHi || data.optionA,
-            data.optionBHi || data.optionB,
-            data.optionCHi || data.optionC,
-            data.optionDHi || data.optionD,
-          ].filter(Boolean);
-
-          return {
-            id: docSnap.id,
-            questionEn: data.questionEn,
-            questionHi: data.questionHi || "",
-            optionsEn,
-            optionsHi,
-            options: optionsEn,
-            answer: correctAnswer,
-            explanationEn: data.explanationEn || "",
-            explanationHi: data.explanationHi || "",
-            topic: data.subject || data.topic || "General Assessment",
-            exam: data.exam,
-          };
-        };
-
-        try {
-          const q = query(
-            questionsRef,
-            where("exam", "==", normalizedExam),
-            where("difficulty", "==", "hard"),
-            limit(100)
-          );
-          const querySnapshot = await getDocs(q);
-
-          querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const built = buildQuestion(docSnap, data);
-            if (built) loadedQuestions.push(built);
-          });
-        } catch (queryError) {
-          console.warn("Query failed, fallback execution sequence activated.");
-        }
-
-        // Fallback Filter Mechanism
-        if (loadedQuestions.length === 0) {
-          const allQuestionsSnapshot = await getDocs(query(questionsRef, limit(500)));
-          allQuestionsSnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const dbExamNormalized = normalizeExamToDBFormat(data.exam || "");
-
-            if (dbExamNormalized === normalizedExam) {
-              const built = buildQuestion(docSnap, data);
-              if (built) loadedQuestions.push(built);
-            }
-          });
-        }
-
-        if (loadedQuestions.length === 0) {
-          setError(`No Warrior (Hard Math/Reasoning) questions currently available for ${targetExam}.`);
-          setQuestions([]);
+        if (subjectList.length === 0) {
+          setError(`No Warrior (Hard Math/Reasoning) questions available yet for ${targetExam}.`);
+          setPhase("result");
           return;
         }
 
-        setQuestions(loadedQuestions.sort(() => Math.random() - 0.5).slice(0, 25));
+        setAvailableSubjects(subjectList);
+        setPhase("subject-select");
       } catch (err) {
-        setError("Failed to resolve technical cluster questions mapping.");
-      } finally {
-        setLoading(false);
+        console.error(err);
+        setError("Failed to load subjects.");
+        setPhase("result");
       }
-    };
+    }
 
-    loadQuestionsFromFirebase();
-  }, [targetExam, user, authLoading]);
+    loadSubjects();
+  }, [targetExam]);
 
-  // =========================
-  // RECORD WRONG ENTRIES DIRECT TO WEAK HOOK
-  // =========================
-  const processFailureSyncTelemetry = async (failedNodes: Question[]) => {
-    if (!user || failedNodes.length === 0) return;
+  // STEP 2 — LOAD 30 HARD QUESTIONS FOR SELECTED SUBJECT (verified)
+  const startQuizForSubject = async (subject: string) => {
     try {
-      const weakRef = collection(db, "weak_questions");
-      const submissionPromises = failedNodes.map((q) => {
-        return addDoc(weakRef, {
-          userId: user.uid,
+      setSelectedSubject(subject);
+      setPhase("loading");
+      setError("");
+      setQuestions([]);
+      setAnswers([]);
+      setCurrent(0);
+      setTimeLeft(TIMER_SECONDS);
+      setScore(0);
+
+      const examFilters = normalizeExam(targetExam);
+
+      const snap = await getDocs(
+        query(
+          collection(db, "questions"),
+          where("exam", "in", examFilters),
+          where("subject", "==", subject),
+          where("difficulty", "==", "hard")
+        )
+      );
+
+      let arr: Question[] = [];
+
+      snap.forEach((d) => {
+        const data: any = d.data();
+        const answerKey = (data.answer || "").toString().toUpperCase();
+
+        const optionMap: Record<string, string> = {
+          A: data.optionA,
+          B: data.optionB,
+          C: data.optionC,
+          D: data.optionD,
+        };
+        const answerValue = optionMap[answerKey];
+
+        const primaryText = data.questionEn || data.question || "";
+        const allOptionsPresent = data.optionA && data.optionB && data.optionC && data.optionD;
+
+        // VERIFICATION — skip invalid/incomplete questions entirely
+        if (!primaryText || !allOptionsPresent || !answerValue) return;
+
+        const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD];
+        const rawOptHi = [
+          data.optionAHi || data.optionA,
+          data.optionBHi || data.optionB,
+          data.optionCHi || data.optionC,
+          data.optionDHi || data.optionD,
+        ];
+
+        const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
+        const { newOptEn, newOptHi, newCorrectText } = shuffleOptions(rawOptEn, rawOptHi, correctIndex);
+
+        arr.push({
+          id: d.id,
+          questionEn: primaryText,
+          questionHi: data.questionHi || "",
+          optionsEn: newOptEn,
+          optionsHi: newOptHi,
+          answer: newCorrectText,
+          explanationEn: data.explanationEn || "",
+          explanationHi: data.explanationHi || "",
+          subject: data.subject || subject,
+        });
+      });
+
+      arr = arr.sort(() => Math.random() - 0.5).slice(0, TOTAL_QUESTIONS);
+
+      if (arr.length === 0) {
+        setError(`No verified hard questions found for ${subject}.`);
+        setPhase("result");
+        return;
+      }
+
+      setQuestions(arr);
+      setAnswers(new Array(arr.length).fill(""));
+      setPhase("quiz");
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load Warrior Questions.");
+      setPhase("result");
+    }
+  };
+
+  // TIMER
+  useEffect(() => {
+    if (phase !== "quiz") return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishTest();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  const selectAnswer = (option: string) => {
+    const updated = [...answers];
+    updated[current] = option;
+    setAnswers(updated);
+  };
+
+  const nextQuestion = () => {
+    if (current < questions.length - 1) {
+      setCurrent(current + 1);
+    } else {
+      finishTest();
+    }
+  };
+
+  // FINISH — save result + push wrong answers to weak_questions
+  const finishTest = async () => {
+    setPhase("submitting");
+
+    let finalScore = 0;
+    questions.forEach((q, i) => {
+      if (answers[i] === q.answer) finalScore++;
+    });
+    setScore(finalScore);
+
+    const uid = user?.uid || "guest";
+
+    try {
+      await addDoc(collection(db, "exam_results"), {
+        userId: uid,
+        userName: user?.displayName || user?.email || "Student",
+        score: finalScore,
+        total: questions.length,
+        examTrack: targetExam,
+        subject: selectedSubject,
+        mode: "warrior",
+        createdAt: serverTimestamp(),
+      });
+
+      const wrongOnes = questions.filter((q, i) => (answers[i] || "").trim() !== q.answer);
+
+      for (const q of wrongOnes) {
+        await addDoc(collection(db, "weak_questions"), {
+          userId: uid,
           questionEn: q.questionEn,
           questionHi: q.questionHi,
           optionsEn: q.optionsEn,
           optionsHi: q.optionsHi,
           correctAnswer: q.answer,
-          topic: q.topic,
-          timestamp: new Date()
+          topic: q.subject || selectedSubject,
+          timestamp: serverTimestamp(),
         });
-      });
-      await Promise.all(submissionPromises);
-    } catch (e) {
-      console.error("Telemetry failure transaction error:", e);
+      }
+    } catch (err) {
+      console.log("Submission error:", err);
     }
-  };
 
-  const handleAnswer = (option: string) => {
-    if (selectedOption) return;
-    setSelectedOption(option);
-
-    const activeQ = questions[currentQuestion];
-    if (option === activeQ.answer) {
-      setScore((prev) => prev + 1);
-    } else {
-      setWrongQuestionTracker((prev) => [...prev, activeQ]);
-    }
-  };
-
-  const handleNext = async () => {
-    if (!selectedOption) return;
-
-    if (currentQuestion + 1 < questions.length) {
-      setCurrentQuestion((prev) => prev + 1);
-      setSelectedOption(null);
-    } else {
-      setIsSubmitting(true);
-      await processFailureSyncTelemetry(wrongQuestionTracker);
-      setIsSubmitting(false);
-      setFinished(true);
-    }
+    setPhase("result");
   };
 
   const handleRestart = () => {
-    setFinished(false);
-    setCurrentQuestion(0);
+    setPhase("subject-select");
+    setCurrent(0);
     setScore(0);
-    setSelectedOption(null);
-    setWrongQuestionTracker([]);
+    setAnswers([]);
+    setSelectedSubject("");
   };
 
-  if (loading || authLoading || isSubmitting) {
+  // ===================== UI =====================
+
+  if (phase === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-xs font-bold uppercase tracking-widest text-slate-400">
-            {isSubmitting ? "Syncing Weak Assessment Telemetry..." : "Assembling Warrior Question Matrix..."}
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Assembling Warrior Questions...
+        </p>
+      </div>
+    );
+  }
+
+  // SUBJECT SELECTION SCREEN
+  if (phase === "subject-select") {
+    return (
+      <div className="min-h-screen bg-slate-50/50 pb-32">
+        <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
+          <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition flex-shrink-0"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div>
+              <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest block">
+                ⚡ Warrior Questions
+              </span>
+              <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
+                {targetExam}
+              </h1>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-2xl mx-auto px-4 mt-8">
+          <h2 className="text-xl font-black text-slate-900 mb-1">Choose Math or Reasoning</h2>
+          <p className="text-slate-500 text-sm mb-6">
+            30 hard-level questions, 30 minutes. Only verified questions shown.
           </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {availableSubjects.map((subject) => (
+              <button
+                key={subject}
+                onClick={() => startQuizForSubject(subject)}
+                className="bg-white border border-slate-200 hover:border-amber-500 rounded-2xl p-5 text-left shadow-sm hover:shadow-md transition-all flex items-center gap-3 group"
+              >
+                <div className="bg-amber-50 text-amber-600 p-2.5 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all">
+                  <Flag size={18} />
+                </div>
+                <span className="font-bold text-sm text-slate-800">{subject}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
-  if (error && questions.length === 0) {
+  if (phase === "submitting") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50/50 p-4">
-        <div className="w-full max-w-md bg-white border rounded-3xl p-6 text-center shadow-sm">
-          <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4">⚠️</div>
-          <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">System Initialization Blocked</h1>
-          <p className="text-slate-400 text-xs mt-2 mb-6 font-medium leading-relaxed">{error}</p>
-          <button onClick={() => router.back()} className="w-full bg-slate-900 text-white font-bold h-11 text-xs rounded-xl uppercase tracking-wider shadow-sm">Return Dashboard</button>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Saving results...
+        </p>
       </div>
     );
   }
 
-  if (finished) {
-    const percentage = Math.round((score / questions.length) * 100);
+  if (phase === "result") {
+    if (error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+          <div className="max-w-md w-full bg-white border border-slate-200 p-6 rounded-2xl shadow-sm text-center">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4">⚠️</div>
+            <p className="text-red-500 font-bold text-sm">{error}</p>
+            <button
+              onClick={() => router.push("/")}
+              className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
+
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-xl shadow-slate-100">
+        <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-xl">
           <div className="text-center mb-6">
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl mx-auto mb-3 border border-blue-100 shadow-sm">🎉</div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">Assessment Concluded</h1>
-            <p className="text-slate-400 text-xs mt-0.5 font-bold uppercase tracking-wider">Warrior Questions Sync Complete</p>
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl mx-auto mb-3 border border-amber-100">🏆</div>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">Warrior Round Complete</h1>
+            <p className="text-slate-400 text-xs mt-0.5 font-bold uppercase tracking-wider">{selectedSubject}</p>
           </div>
 
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mb-6 text-center border border-slate-200/60">
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Diagnostic Metrics</span>
-            <div className="text-5xl font-black text-blue-600 tracking-tight mt-1">{score}/{questions.length}</div>
-            <div className="text-base font-bold text-slate-600 mt-1">{percentage}% Performance Ratio</div>
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Score</span>
+            <div className="text-5xl font-black text-amber-600 tracking-tight mt-1">{score}/{questions.length}</div>
+            <div className="text-base font-bold text-slate-600 mt-1">{percentage}%</div>
           </div>
 
-          {wrongQuestionTracker.length > 0 && (
-            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3.5 mb-6 text-center text-rose-800 text-[11px] font-semibold leading-relaxed">
-              ⚠️ {wrongQuestionTracker.length} incorrect answers recorded. Syncing items directly to your <span className="font-bold underline">Weak Practice Node</span>.
-            </div>
-          )}
-
           <div className="space-y-2.5">
-            <button onClick={handleRestart} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold h-12 text-xs rounded-xl uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-1.5"><RotateCcw size={14} /> Re-Initialize Stream</button>
-            <button onClick={() => router.push("/")} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold h-12 text-xs rounded-xl uppercase tracking-wider transition-all">Go Back</button>
+            <button
+              onClick={handleRestart}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold h-12 text-xs rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center gap-1.5"
+            >
+              <RotateCcw size={14} /> Try Another Subject
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold h-12 text-xs rounded-xl uppercase tracking-wider"
+            >
+              Go Back
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  const currentQ = questions[currentQuestion];
-  const answerDisabled = selectedOption !== null;
+  // QUIZ SCREEN
+  const q = questions[current];
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-32 antialiased text-slate-900">
-
-      {/* APP HEADER */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <button onClick={() => router.back()} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-xs font-bold uppercase tracking-wider"><ArrowLeft size={16} /> Quit</button>
-          <div className="text-center">
-            <span className="text-[9px] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-amber-700 font-black tracking-widest uppercase block w-max mx-auto">⚡ {targetExam}</span>
-            <h1 className="text-sm font-black text-slate-800 uppercase tracking-tight mt-1">Item {currentQuestion + 1} / {questions.length}</h1>
+        <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setPhase("subject-select")}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition flex-shrink-0"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div>
+              <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest block">{selectedSubject}</span>
+              <h1 className="text-sm font-black text-slate-800 uppercase tracking-tight">{targetExam}</h1>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Score</span>
-            <span className="text-base font-black text-blue-600 tracking-tight block mt-0.5">{score}</span>
+          <div className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-xl font-black text-lg tracking-tight flex items-center gap-2 shadow-sm">
+            <Timer size={16} className="animate-pulse" />
+            <span>{formatTime(timeLeft)}</span>
           </div>
         </div>
-        <div className="h-1 w-full bg-slate-100"><div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} /></div>
+        <div className="h-1 w-full bg-slate-100">
+          <div
+            className="h-full bg-amber-500 transition-all duration-300"
+            style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+          />
+        </div>
       </header>
 
-      {/* COMPONENT BODY */}
       <main className="max-w-2xl mx-auto px-4 mt-6 space-y-4">
-
         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-          <div className="flex items-center mb-5 gap-2">
+          <div className="flex items-center gap-2 mb-5">
             <span className="bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wide">🔥 Hard</span>
-            <span className="bg-slate-50 border text-slate-500 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wide">Category: {currentQ?.topic}</span>
+            <span className="bg-slate-50 border text-slate-500 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wide">
+              Question {current + 1} / {questions.length}
+            </span>
           </div>
 
-          {/* QUESTION BOX */}
           <div className="space-y-4 mb-8">
-            <h2 className="text-lg font-bold leading-relaxed text-slate-800 tracking-tight">{currentQ.questionEn}</h2>
-            {currentQ.questionHi && <h2 className="text-lg font-semibold leading-relaxed text-slate-600 border-t border-dashed border-slate-100 pt-3 font-hindi">{currentQ.questionHi}</h2>}
+            <h2 className="text-lg font-bold leading-relaxed text-slate-800">{q.questionEn}</h2>
+            {q.questionHi && (
+              <h2 className="text-lg font-semibold leading-relaxed text-slate-600 border-t border-dashed border-slate-100 pt-3 font-hindi">
+                {q.questionHi}
+              </h2>
+            )}
           </div>
 
-          {/* OPTIONS SELECTION GRID */}
           <div className="space-y-3">
-            {currentQ.optionsEn.map((optionEn, index) => {
-              const optionHi = currentQ.optionsHi?.[index] || "";
-              const isCorrect = optionEn === currentQ.answer;
-              const isSelected = selectedOption === optionEn;
-
-              let btnStyle = "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800";
-              let badgeStyle = "bg-slate-100 text-slate-500";
-
-              if (answerDisabled) {
-                if (isCorrect) {
-                  btnStyle = "border-emerald-600 bg-emerald-50/60 text-emerald-900 shadow-sm";
-                  badgeStyle = "bg-emerald-600 text-white";
-                } else if (isSelected) {
-                  btnStyle = "border-rose-500 bg-rose-50/60 text-rose-900";
-                  badgeStyle = "bg-rose-500 text-white";
-                } else {
-                  btnStyle = "border-slate-100 bg-slate-50/30 text-slate-400 opacity-60";
-                  badgeStyle = "bg-slate-100 text-slate-400";
-                }
-              }
-
+            {q.optionsEn.map((optEn, index) => {
+              const optHi = q.optionsHi?.[index] || "";
+              const isSelected = answers[current] === optEn;
               return (
                 <button
                   key={index}
-                  onClick={() => handleAnswer(optionEn)}
-                  disabled={answerDisabled}
-                  className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center justify-between group ${btnStyle}`}
+                  onClick={() => selectAnswer(optEn)}
+                  className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${
+                    isSelected
+                      ? "border-amber-600 bg-amber-50/60 shadow-sm text-amber-900"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
+                  }`}
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${badgeStyle}`}>{String.fromCharCode(65 + index)}</div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-bold block">{optionEn}</span>
-                      {optionHi && <span className="text-xs font-medium block text-slate-500 mt-0.5 font-hindi">{optionHi}</span>}
-                    </div>
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs flex-shrink-0 ${
+                      isSelected ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                    }`}
+                  >
+                    {String.fromCharCode(65 + index)}
                   </div>
-
-                  {answerDisabled && isCorrect && <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-100/50 px-2 py-0.5 rounded flex items-center gap-1 ml-2"><CheckCircle2 size={11} /> Correct</span>}
-                  {answerDisabled && isSelected && !isCorrect && <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-100/50 px-2 py-0.5 rounded flex items-center gap-1 ml-2"><XCircle size={11} /> Inaccurate</span>}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold leading-relaxed break-words">{optEn}</div>
+                    {optHi && <div className="text-xs font-medium text-slate-600 mt-1 font-hindi break-words">{optHi}</div>}
+                  </div>
                 </button>
               );
             })}
           </div>
 
-          {/* RATIO SOLUTION WINDOW */}
-          {answerDisabled && (currentQ.explanationEn || currentQ.explanationHi) && (
-            <div className={`mt-6 rounded-2xl p-4 border text-xs leading-relaxed ${selectedOption === currentQ.answer ? "bg-blue-50/60 border-blue-100 text-blue-900" : "bg-amber-50/60 border-amber-100 text-amber-900"}`}>
-              <div className="flex items-center gap-1.5 font-black uppercase tracking-wider text-[10px] text-slate-400 mb-2"><BookOpen size={12} /> Solution Explanation / व्याख्या</div>
-              {currentQ.explanationEn && <p className="font-bold text-slate-700 block mb-1.5">{currentQ.explanationEn}</p>}
-              {currentQ.explanationHi && <p className="font-medium text-slate-600 block border-t border-slate-200/40 pt-1.5 font-hindi">{currentQ.explanationHi}</p>}
-            </div>
-          )}
-
-          {/* ACTIONS HUB ENTRY */}
-          <div className="mt-6 pt-4 border-t border-slate-100">
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-3">
+            {current > 0 && (
+              <button
+                onClick={() => setCurrent(current - 1)}
+                className="inline-flex items-center gap-1 px-4 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all border border-slate-200/40"
+              >
+                <ArrowLeft size={14} /> Back
+              </button>
+            )}
             <button
-              onClick={handleNext}
-              disabled={!selectedOption}
-              className={`w-full h-12 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm ${selectedOption ? "bg-slate-900 hover:bg-slate-800 text-white" : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"}`}
+              onClick={nextQuestion}
+              disabled={!answers[current]}
+              className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${
+                answers[current]
+                  ? "bg-slate-900 hover:bg-slate-800 text-white"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+              }`}
             >
-              {currentQuestion + 1 === questions.length ? "✓ Terminate & Submit" : "Advance Node →"}
+              {current === questions.length - 1 ? (
+                <>
+                  <Flag size={13} /> Submit
+                </>
+              ) : (
+                <>
+                  Next <ArrowRight size={13} />
+                </>
+              )}
             </button>
           </div>
+        </div>
 
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-3.5">Progress Map</span>
+          <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
+            {questions.map((_, i) => {
+              const isCurrent = i === current;
+              const isAnswered = !!answers[i];
+              return (
+                <button
+                  key={i}
+                  onClick={() => setCurrent(i)}
+                  className={`h-9 rounded-lg font-bold text-xs transition-all border ${
+                    isCurrent
+                      ? "bg-amber-600 border-amber-600 text-white shadow-sm ring-2 ring-amber-100"
+                      : isAnswered
+                      ? "bg-amber-50 border-amber-200 text-amber-600 font-black"
+                      : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </main>
     </div>
