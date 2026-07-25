@@ -232,7 +232,7 @@ export default function Dashboard() {
                 <Zap size={10} />Math/Reasoning
               </div>
               <h3 className="text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate">
-                   🎯 Warrior battal Questions 
+                   🎯 Warrior Battal Ground 
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs font-medium leading-normal">
                 Initiate a high-velocity -minute evaluation cycle for structural review.

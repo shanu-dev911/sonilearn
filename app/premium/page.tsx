@@ -13,9 +13,9 @@ export default function PremiumPage() {
     const router = useRouter();
 
     const features = [
-        { icon: Zap, text: "Unlimited Fast Tests", desc: "No cooling-down period between assessment cycles." },
+        { icon: Zap, text: " Warrior Battal Ground ", desc: "No cooling-down period between assessment cycles." },
         { icon: Trophy, text: "All India Leaderboard Matrix", desc: "Compare target scores across live peer metrics." },
-        { icon: BookOpen, text: "Premium PYQ Database Access", desc: "Unlock strict validated official question logs." },
+       
         { icon: BarChart3, text: "Weak Topic Performance Analysis", desc: "Isolate structural evaluation errors instantly." },
         { icon: ShieldCheck, text: "100% Ad-Free Experience", desc: "Zero telemetry distraction during test execution." },
         { icon: CheckCircle2, text: "Daily Premium Challenge Access", desc: "Execute hyper-focused exclusive daily items." },

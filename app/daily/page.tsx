@@ -53,7 +53,7 @@ type Phase =
   | "result";
 
 const TOTAL_QUESTIONS = 30;
-const TIMER_SECONDS = 10 * 60;
+const TIMER_SECONDS = 30 * 60; // 🎯 30 minutes
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -61,15 +61,32 @@ function formatTime(sec: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// 🎯 RUNTIME SAFETY SHUFFLE — ensures options are always randomized fresh,
-// regardless of how they were stored in the database. This guarantees the
-// correct answer position is never predictable (e.g. never always "A").
-function shuffleQuestionOptions(optEn: string[], optHi: string[], correctIndex: number) {
-  const indices = [0, 1, 2, 3];
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
+// 🎯 STRONG RUNTIME RESHUFFLE — double-pass Fisher-Yates using crypto randomness
+// where available. Guarantees option order is genuinely randomized fresh every
+// single load, regardless of any pattern the questions were saved with in the
+// database (e.g. never predictable, never always the same position).
+function getSecureRandom(): number {
+  if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    return arr[0] / (0xffffffff + 1);
   }
+  return Math.random();
+}
+
+function fisherYatesShuffle(arr: number[]): number[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(getSecureRandom() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function shuffleQuestionOptions(optEn: string[], optHi: string[], correctIndex: number) {
+  // Double-pass shuffle for extra guaranteed randomness
+  let indices = fisherYatesShuffle([0, 1, 2, 3]);
+  indices = fisherYatesShuffle(indices);
 
   const newOptEn = indices.map((idx) => optEn[idx]);
   const newOptHi = indices.map((idx) => optHi[idx]);
@@ -91,7 +108,6 @@ export default function DailyChallengePage() {
   const [targetExam, setTargetExam] = useState("");
   const [user, authLoading, authError] = useAuthState(auth);
 
-  // 🎯 SUBJECT SELECTION STATE
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("");
 
@@ -174,7 +190,7 @@ export default function DailyChallengePage() {
     return () => unsubscribe();
   }, [user, authLoading, authError]);
 
-  // 🎯 STEP 1 — FETCH AVAILABLE SUBJECTS FOR THIS EXAM
+  // STEP 1 — FETCH AVAILABLE SUBJECTS FOR THIS EXAM
   useEffect(() => {
     if (!targetExam) return;
 
@@ -219,7 +235,7 @@ export default function DailyChallengePage() {
     loadSubjects();
   }, [targetExam]);
 
-  // 🎯 STEP 2 — LOAD QUESTIONS FOR SELECTED SUBJECT (with runtime verification + reshuffle)
+  // STEP 2 — LOAD QUESTIONS FOR SELECTED SUBJECT (with runtime verification + reshuffle)
   const startQuizForSubject = async (subject: string) => {
     try {
       setSelectedSubject(subject);
@@ -247,7 +263,7 @@ export default function DailyChallengePage() {
         const data: any = d.data();
         const answerKey = data.answer?.toString().toUpperCase();
 
-        // 🎯 VERIFICATION — every question must have a valid answer key mapping
+        // VERIFICATION — every question must have a valid answer key mapping
         // to one of the 4 options. If mapping is broken, question is skipped
         // entirely rather than shown with a wrong/blank answer.
         const optionMap: Record<string, string> = {
@@ -278,7 +294,7 @@ export default function DailyChallengePage() {
 
         const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
 
-        // 🎯 RUNTIME RESHUFFLE — options re-randomized fresh every load,
+        // RUNTIME RESHUFFLE — options re-randomized fresh every load,
         // so the correct answer position is never predictable/patterned.
         const { newOptEn, newOptHi, newCorrectText } = shuffleQuestionOptions(
           rawOptEn,
@@ -426,7 +442,7 @@ export default function DailyChallengePage() {
     );
   }
 
-  // 🎯 SUBJECT SELECTION SCREEN
+  // SUBJECT SELECTION SCREEN
   if (phase === "subject-select") {
     return (
       <div className="min-h-screen bg-slate-50/50 pb-32">

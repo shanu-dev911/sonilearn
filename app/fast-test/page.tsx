@@ -43,21 +43,20 @@ const normalizeExam = (exam: string) => {
   );
 };
 
-// 🎯 WARRIOR MODE — only Math/Reasoning subject variants qualify
-const WARRIOR_SUBJECTS = [
-  "mathematics",
-  "quantitative aptitude",
-  "maths",
-  "math",
+// 🎯 CATEGORY MAPPING — group all subject-name variants into just 2 buckets
+const MATH_VARIANTS = ["mathematics", "quantitative aptitude", "maths", "math"];
+const REASONING_VARIANTS = [
   "reasoning",
   "general intelligence and reasoning",
   "general intelligence & reasoning",
   "logical reasoning",
 ];
 
-function isWarriorSubject(subject: string): boolean {
+function getCategoryForSubject(subject: string): "Math" | "Reasoning" | null {
   const s = (subject || "").trim().toLowerCase();
-  return WARRIOR_SUBJECTS.some((allowed) => s.includes(allowed) || allowed.includes(s));
+  if (MATH_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Math";
+  if (REASONING_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Reasoning";
+  return null;
 }
 
 function formatTime(sec: number) {
@@ -66,13 +65,33 @@ function formatTime(sec: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// 🎯 RUNTIME RESHUFFLE — fresh randomization every load, no predictable answer pattern
-function shuffleOptions(optEn: string[], optHi: string[], correctIndex: number) {
-  const indices = [0, 1, 2, 3];
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
+// 🎯 STRONG RUNTIME RESHUFFLE — double-pass Fisher-Yates using crypto randomness
+// where available, guarantees the option order is genuinely different every
+// single time a question loads, regardless of how it was stored in the database.
+function getSecureRandom(): number {
+  if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    return arr[0] / (0xffffffff + 1);
   }
+  return Math.random();
+}
+
+function fisherYatesShuffle(arr: number[]): number[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(getSecureRandom() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function shuffleOptions(optEn: string[], optHi: string[], correctIndex: number) {
+  // Double-pass shuffle: run Fisher-Yates twice in sequence for extra
+  // guaranteed randomness, avoiding any residual pattern from storage order.
+  let indices = fisherYatesShuffle([0, 1, 2, 3]);
+  indices = fisherYatesShuffle(indices);
+
   const newOptEn = indices.map((idx) => optEn[idx]);
   const newOptHi = indices.map((idx) => optHi[idx]);
   const newCorrectIndex = indices.indexOf(correctIndex);
@@ -87,7 +106,8 @@ export default function FastTestPage() {
   const [targetExam, setTargetExam] = useState("");
   const [error, setError] = useState("");
 
-  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [categorySubjectsMap, setCategorySubjectsMap] = useState<Record<string, string[]>>({});
   const [selectedSubject, setSelectedSubject] = useState("");
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -131,7 +151,7 @@ export default function FastTestPage() {
     return () => unsub();
   }, [user, authLoading]);
 
-  // STEP 1 — FIND AVAILABLE MATH/REASONING SUBJECTS FOR THIS EXAM (hard only)
+  // STEP 1 — FIND AVAILABLE MATH/REASONING CATEGORIES FOR THIS EXAM (hard only)
   useEffect(() => {
     if (!targetExam) return;
 
@@ -148,24 +168,33 @@ export default function FastTestPage() {
           )
         );
 
-        const subjectSet = new Set<string>();
+        const categoryMap: Record<string, Set<string>> = {};
+
         snap.forEach((d) => {
           const data: any = d.data();
-          const subj = data.subject || data.topic || "";
-          if (isWarriorSubject(subj)) {
-            subjectSet.add(subj);
-          }
+          const rawSubject = data.subject || data.topic || "";
+          const category = getCategoryForSubject(rawSubject);
+          if (!category) return;
+
+          if (!categoryMap[category]) categoryMap[category] = new Set();
+          categoryMap[category].add(rawSubject);
         });
 
-        const subjectList = Array.from(subjectSet).sort();
+        const categories = Object.keys(categoryMap).sort();
 
-        if (subjectList.length === 0) {
+        if (categories.length === 0) {
           setError(`No Warrior (Hard Math/Reasoning) questions available yet for ${targetExam}.`);
           setPhase("result");
           return;
         }
 
-        setAvailableSubjects(subjectList);
+        const subjectsMap: Record<string, string[]> = {};
+        Object.entries(categoryMap).forEach(([cat, subjectSet]) => {
+          subjectsMap[cat] = Array.from(subjectSet);
+        });
+
+        setAvailableCategories(categories);
+        setCategorySubjectsMap(subjectsMap);
         setPhase("subject-select");
       } catch (err) {
         console.error(err);
@@ -177,10 +206,10 @@ export default function FastTestPage() {
     loadSubjects();
   }, [targetExam]);
 
-  // STEP 2 — LOAD 30 HARD QUESTIONS FOR SELECTED SUBJECT (verified)
-  const startQuizForSubject = async (subject: string) => {
+  // STEP 2 — LOAD 30 HARD QUESTIONS FOR SELECTED CATEGORY (verified)
+  const startQuizForSubject = async (category: string) => {
     try {
-      setSelectedSubject(subject);
+      setSelectedSubject(category);
       setPhase("loading");
       setError("");
       setQuestions([]);
@@ -190,12 +219,13 @@ export default function FastTestPage() {
       setScore(0);
 
       const examFilters = normalizeExam(targetExam);
+      const rawSubjectVariants = categorySubjectsMap[category] || [category];
 
       const snap = await getDocs(
         query(
           collection(db, "questions"),
           where("exam", "in", examFilters),
-          where("subject", "==", subject),
+          where("subject", "in", rawSubjectVariants),
           where("difficulty", "==", "hard")
         )
       );
@@ -240,14 +270,14 @@ export default function FastTestPage() {
           answer: newCorrectText,
           explanationEn: data.explanationEn || "",
           explanationHi: data.explanationHi || "",
-          subject: data.subject || subject,
+          subject: data.subject || category,
         });
       });
 
       arr = arr.sort(() => Math.random() - 0.5).slice(0, TOTAL_QUESTIONS);
 
       if (arr.length === 0) {
-        setError(`No verified hard questions found for ${subject}.`);
+        setError(`No verified hard questions found for ${category}.`);
         setPhase("result");
         return;
       }
@@ -390,16 +420,16 @@ export default function FastTestPage() {
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {availableSubjects.map((subject) => (
+            {availableCategories.map((category) => (
               <button
-                key={subject}
-                onClick={() => startQuizForSubject(subject)}
+                key={category}
+                onClick={() => startQuizForSubject(category)}
                 className="bg-white border border-slate-200 hover:border-amber-500 rounded-2xl p-5 text-left shadow-sm hover:shadow-md transition-all flex items-center gap-3 group"
               >
                 <div className="bg-amber-50 text-amber-600 p-2.5 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all">
                   <Flag size={18} />
                 </div>
-                <span className="font-bold text-sm text-slate-800">{subject}</span>
+                <span className="font-bold text-sm text-slate-800">{category}</span>
               </button>
             ))}
           </div>
