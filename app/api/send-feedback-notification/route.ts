@@ -2,43 +2,50 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { userName, userEmail, message } = await req.json();
+    const body = await req.json().catch(() => null);
 
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-
-    if (!botToken || !chatId) {
-      console.error("Telegram env vars missing!", { botToken: !!botToken, chatId: !!chatId });
-      return NextResponse.json({ error: "Telegram config missing" }, { status: 500 });
+    if (!body) {
+      return NextResponse.json({ error: "Invalid JSON Payload" }, { status: 400 });
     }
 
-    const safeName = (userName || "Unknown").replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
-    const safeEmail = (userEmail || "N/A").replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
-    const safeMessage = (message || "").replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
+    const { userName, userEmail, message } = body;
 
-    const text = "New Feedback Received!\n\nName: " + safeName + "\nEmail: " + safeEmail + "\n\nMessage:\n" + safeMessage;
+    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-    const telegramUrl = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+    // Check if env variables are defined on Vercel
+    if (!BOT_TOKEN || !CHAT_ID) {
+      console.error("Missing Telegram Env Variables on Server!");
+      return NextResponse.json(
+        { error: "Server Configuration Missing: Telegram Credentials" },
+        { status: 500 }
+      );
+    }
 
-    const response = await fetch(telegramUrl, {
+    const textMessage = `🚀 *New Feedback Received!*\n\n👤 *Name:* ${userName || "Student"}\n📧 *Email:* ${userEmail || "N/A"}\n💬 *Message:* ${message}`;
+
+    const telegramUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+    const res = await fetch(telegramUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
+        chat_id: CHAT_ID,
+        text: textMessage,
+        parse_mode: "Markdown",
       }),
     });
 
-    const result = await response.json();
+    const data = await res.json();
 
-    if (!result.ok) {
-      console.error("Telegram API error:", result);
-      return NextResponse.json({ error: "Telegram send failed", details: result }, { status: 500 });
+    if (!res.ok || !data.ok) {
+      console.error("Telegram API Rejection:", data);
+      return NextResponse.json({ error: data.description || "Telegram API Error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Telegram notification error:", error);
-    return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Internal Route Execution Error:", error);
+    return NextResponse.json({ error: error.message || "Internal Server Failure" }, { status: 500 });
   }
 }
