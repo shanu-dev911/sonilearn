@@ -14,6 +14,46 @@ const examsData: string[] = [
     "RRB Paramedical", "RRB Ministerial & Isolated", "RRB Apprentice"
 ];
 
+// 🎯 EXAMS THAT HAVE MULTIPLE STAGES (CBT-1/2 or Tier-1/2)
+// Only these exams will show the stage-selection step.
+const MULTI_STAGE_EXAMS: Record<string, { label: string; options: { value: string; label: string }[] }> = {
+    "SSC CGL": {
+        label: "Which Tier are you preparing for?",
+        options: [
+            { value: "TIER_1", label: "Tier 1" },
+            { value: "TIER_2", label: "Tier 2" },
+        ],
+    },
+    "SSC CHSL": {
+        label: "Which Tier are you preparing for?",
+        options: [
+            { value: "TIER_1", label: "Tier 1" },
+            { value: "TIER_2", label: "Tier 2" },
+        ],
+    },
+    "RRB NTPC": {
+        label: "Which CBT stage are you preparing for?",
+        options: [
+            { value: "CBT_1", label: "CBT 1" },
+            { value: "CBT_2", label: "CBT 2" },
+        ],
+    },
+    "RRB ALP": {
+        label: "Which CBT stage are you preparing for?",
+        options: [
+            { value: "CBT_1", label: "CBT 1" },
+            { value: "CBT_2", label: "CBT 2" },
+        ],
+    },
+    "RRB JE": {
+        label: "Which CBT stage are you preparing for?",
+        options: [
+            { value: "CBT_1", label: "CBT 1" },
+            { value: "CBT_2", label: "CBT 2" },
+        ],
+    },
+};
+
 export default function CompleteProfile() {
 
     const router = useRouter();
@@ -24,8 +64,12 @@ export default function CompleteProfile() {
     const [phone, setPhone] = useState("");
 
     const [targetExam, setTargetExam] = useState("");
+    const [examStage, setExamStage] = useState("");
 
     const [loading, setLoading] = useState(false);
+
+    const stageConfig = MULTI_STAGE_EXAMS[targetExam];
+    const needsStageSelection = !!stageConfig;
 
     // ✅ PHONE VALIDATION
     const handlePhoneChange = (
@@ -40,11 +84,23 @@ export default function CompleteProfile() {
 
     };
 
-    // ✅ SAVE PROFILE
+    // 🎯 When user picks an exam on step 2, decide whether to show step 3
+    const handleSelectExam = (exam: string) => {
+        setTargetExam(exam);
+        setExamStage(""); // reset stage if exam changes
+    };
+
+    // 🎯 Called from "Start" button on step 2 (single-stage exams)
+    // or from step 3 (multi-stage exams)
     const handleFinish = async () => {
 
         if (!name || phone.length !== 10 || !targetExam) {
             alert("Please fill all details");
+            return;
+        }
+
+        if (needsStageSelection && !examStage) {
+            alert("Please select your exam stage");
             return;
         }
 
@@ -72,6 +128,8 @@ export default function CompleteProfile() {
 
                     targetExam,
 
+                    examStage: needsStageSelection ? examStage : "",
+
                     profileCompleted: true,
                 }
             );
@@ -90,6 +148,15 @@ export default function CompleteProfile() {
 
         }
 
+    };
+
+    // 🎯 Step 2 "Start" button — go to stage-select if needed, else finish directly
+    const handleStep2Continue = () => {
+        if (needsStageSelection) {
+            setStep(3);
+        } else {
+            handleFinish();
+        }
     };
 
     return (
@@ -127,6 +194,15 @@ export default function CompleteProfile() {
                         className={`h-2 flex-1 rounded-full transition-all duration-300
 
             ${step >= 2
+                                ? "bg-blue-600"
+                                : "bg-gray-200"
+                            }`}
+                    />
+
+                    <div
+                        className={`h-2 flex-1 rounded-full transition-all duration-300
+
+            ${step >= 3
                                 ? "bg-blue-600"
                                 : "bg-gray-200"
                             }`}
@@ -229,7 +305,7 @@ export default function CompleteProfile() {
 
                                 <button
                                     key={exam}
-                                    onClick={() => setTargetExam(exam)}
+                                    onClick={() => handleSelectExam(exam)}
                                     className={`w-full p-4 rounded-2xl border-2 text-left font-bold transition-all
 
                   ${targetExam === exam
@@ -260,10 +336,83 @@ export default function CompleteProfile() {
 
                             <button
                                 disabled={!targetExam || loading}
-                                onClick={handleFinish}
+                                onClick={handleStep2Continue}
                                 className={`flex-1 py-4 rounded-2xl font-black transition-all
 
                 ${!targetExam || loading
+                                        ? "bg-gray-200 text-gray-400"
+                                        : "bg-green-600 text-white hover:bg-green-700"
+                                    }`}
+                            >
+
+                                {loading
+                                    ? "Please wait..."
+                                    : needsStageSelection
+                                        ? "Next →"
+                                        : "Start 🚀"}
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                )}
+
+                {/* 🎯 STEP 3 — EXAM STAGE SELECTION (only for multi-stage exams) */}
+                {step === 3 && stageConfig && (
+
+                    <div>
+
+                        <h2 className="text-3xl font-black text-gray-800 mb-2">
+                            Select Your Stage
+                        </h2>
+
+                        <p className="text-gray-500 mb-8">
+                            {stageConfig.label}
+                        </p>
+
+                        <div className="space-y-3">
+
+                            {stageConfig.options.map((opt) => (
+
+                                <button
+                                    key={opt.value}
+                                    onClick={() => setExamStage(opt.value)}
+                                    className={`w-full p-5 rounded-2xl border-2 text-left font-bold transition-all
+
+                  ${examStage === opt.value
+                                            ? "bg-blue-600 border-blue-600 text-white"
+                                            : "bg-white border-gray-200 text-gray-700 hover:border-blue-300"
+                                        }`}
+                                >
+
+                                    📘 {opt.label}
+
+                                </button>
+
+                            ))}
+
+                        </div>
+
+                        {/* BUTTONS */}
+                        <div className="flex gap-3 mt-8">
+
+                            <button
+                                onClick={() => setStep(2)}
+                                className="flex-1 py-4 rounded-2xl border border-gray-200 font-bold"
+                            >
+
+                                Back
+
+                            </button>
+
+                            <button
+                                disabled={!examStage || loading}
+                                onClick={handleFinish}
+                                className={`flex-1 py-4 rounded-2xl font-black transition-all
+
+                ${!examStage || loading
                                         ? "bg-gray-200 text-gray-400"
                                         : "bg-green-600 text-white hover:bg-green-700"
                                     }`}

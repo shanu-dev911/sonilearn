@@ -7,14 +7,61 @@ import { auth, db } from "@/lib/firebase-client";
 import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, User, Mail, ShieldCheck, Target, LogOut, Check, Edit2, BookmarkCheck, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, User, Mail, ShieldCheck, Target, LogOut, Check, Edit2, BookmarkCheck, MessageSquare, Send, Layers } from "lucide-react";
 
-// 🎯 EXAMS CONFIGURATION PIPELINE
 const examsData = [
     "SSC CGL", "SSC CHSL", "SSC MTS", "SSC GD", "SSC CPO", "SSC Stenographer", "SSC JE",
     "RRB NTPC", "RRB Group D", "RRB ALP", "RRB Technician", "RRB JE", "RRB SSE",
     "RRB Paramedical", "RRB Ministerial & Isolated", "RRB Apprentice"
 ];
+
+interface StageOption {
+    value: string;
+    label: string;
+}
+
+interface StageConfigEntry {
+    label: string;
+    options: StageOption[];
+}
+
+const MULTI_STAGE_EXAMS: Record<string, StageConfigEntry> = {
+    "SSC CGL": {
+        label: "Which Tier are you preparing for?",
+        options: [
+            { value: "TIER_1", label: "Tier 1" },
+            { value: "TIER_2", label: "Tier 2" },
+        ],
+    },
+    "SSC CHSL": {
+        label: "Which Tier are you preparing for?",
+        options: [
+            { value: "TIER_1", label: "Tier 1" },
+            { value: "TIER_2", label: "Tier 2" },
+        ],
+    },
+    "RRB NTPC": {
+        label: "Which CBT stage are you preparing for?",
+        options: [
+            { value: "CBT_1", label: "CBT 1" },
+            { value: "CBT_2", label: "CBT 2" },
+        ],
+    },
+    "RRB ALP": {
+        label: "Which CBT stage are you preparing for?",
+        options: [
+            { value: "CBT_1", label: "CBT 1" },
+            { value: "CBT_2", label: "CBT 2" },
+        ],
+    },
+    "RRB JE": {
+        label: "Which CBT stage are you preparing for?",
+        options: [
+            { value: "CBT_1", label: "CBT 1" },
+            { value: "CBT_2", label: "CBT 2" },
+        ],
+    },
+};
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -24,10 +71,14 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [targetExam, setTargetExam] = useState("");
+    const [examStage, setExamStage] = useState("");
 
     const [feedbackText, setFeedbackText] = useState("");
     const [feedbackSending, setFeedbackSending] = useState(false);
     const [feedbackSent, setFeedbackSent] = useState(false);
+
+    const stageConfig = MULTI_STAGE_EXAMS[targetExam];
+    const needsStageSelection = Boolean(stageConfig);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -41,6 +92,7 @@ export default function ProfilePage() {
                         const data = userSnap.data();
                         setUserData(data);
                         setTargetExam(data.targetExam || "");
+                        setExamStage(data.examStage || "");
                     }
                 } else {
                     router.push("/login");
@@ -55,19 +107,33 @@ export default function ProfilePage() {
         return () => unsubscribe();
     }, [router]);
 
+    const handleSelectExam = (exam: string) => {
+        setTargetExam(exam);
+        setExamStage("");
+    };
+
     const handleUpdate = async () => {
         try {
             if (!user || !targetExam) return;
 
+            if (needsStageSelection && !examStage) {
+                alert("Please select your exam stage (CBT/Tier)");
+                return;
+            }
+
+            const stageToSave = needsStageSelection ? examStage : "";
+
             await updateDoc(doc(db, "users", user.uid), {
                 examType: "Central",
                 state: "Central",
-                targetExam,
+                targetExam: targetExam,
+                examStage: stageToSave,
             });
 
             setUserData({
                 ...userData,
-                targetExam,
+                targetExam: targetExam,
+                examStage: stageToSave,
             });
 
             setIsEditing(false);
@@ -121,6 +187,15 @@ export default function ProfilePage() {
         }
     };
 
+    const getStageLabel = (exam: string, stageValue: string): string => {
+        const config = MULTI_STAGE_EXAMS[exam];
+        if (!config || !stageValue) return "";
+        const found = config.options.find(function (o) {
+            return o.value === stageValue;
+        });
+        return found ? found.label : "";
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -131,6 +206,12 @@ export default function ProfilePage() {
             </div>
         );
     }
+
+    const currentStageLabel = userData?.examStage
+        ? getStageLabel(userData.targetExam, userData.examStage)
+        : "";
+
+    const commitDisabled = !targetExam || (needsStageSelection && !examStage);
 
     return (
         <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans antialiased">
@@ -199,6 +280,12 @@ export default function ProfilePage() {
                                     <p className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
                                         {userData?.targetExam || "No active pipeline selected"}
                                     </p>
+                                    {currentStageLabel && (
+                                        <span className="inline-flex items-center gap-1 mt-2 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide">
+                                            <Layers size={11} />
+                                            <span>{currentStageLabel}</span>
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="bg-blue-600 text-white p-2 rounded-xl shadow-md shadow-blue-600/10">
                                     <BookmarkCheck size={20} />
@@ -214,11 +301,12 @@ export default function ProfilePage() {
                                             return (
                                                 <button
                                                     key={exam}
-                                                    onClick={() => setTargetExam(exam)}
-                                                    className={`px-3 py-2.5 rounded-xl text-left text-xs font-bold border transition-all flex items-center justify-between ${isSelected
-                                                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/10"
-                                                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                                                        }`}
+                                                    onClick={() => handleSelectExam(exam)}
+                                                    className={
+                                                        isSelected
+                                                            ? "px-3 py-2.5 rounded-xl text-left text-xs font-bold border transition-all flex items-center justify-between bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/10"
+                                                            : "px-3 py-2.5 rounded-xl text-left text-xs font-bold border transition-all flex items-center justify-between bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                                                    }
                                                 >
                                                     <span className="truncate">{exam}</span>
                                                     {isSelected && <Check size={12} className="flex-shrink-0 ml-1" />}
@@ -227,6 +315,34 @@ export default function ProfilePage() {
                                         })}
                                     </div>
                                 </div>
+
+                                {needsStageSelection && (
+                                    <div>
+                                        <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-2.5 block">
+                                            {stageConfig.label}
+                                        </span>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {stageConfig.options.map((opt) => {
+                                                const isSelected = examStage === opt.value;
+                                                return (
+                                                    <button
+                                                        key={opt.value}
+                                                        onClick={() => setExamStage(opt.value)}
+                                                        className={
+                                                            isSelected
+                                                                ? "px-4 py-3 rounded-xl text-center text-xs font-bold border transition-all flex items-center justify-center gap-1.5 bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-500/10"
+                                                                : "px-4 py-3 rounded-xl text-center text-xs font-bold border transition-all flex items-center justify-center gap-1.5 bg-white border-slate-200 text-slate-700 hover:border-amber-300"
+                                                        }
+                                                    >
+                                                        <Layers size={12} />
+                                                        <span>{opt.label}</span>
+                                                        {isSelected && <Check size={12} />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="flex gap-3 pt-2">
                                     <button
@@ -237,11 +353,12 @@ export default function ProfilePage() {
                                     </button>
                                     <button
                                         onClick={handleUpdate}
-                                        disabled={!targetExam}
-                                        className={`flex-1 rounded-xl py-3 font-bold text-xs text-white transition-all shadow-md ${targetExam
-                                            ? "bg-slate-900 hover:bg-slate-800"
-                                            : "bg-slate-200 cursor-not-allowed shadow-none text-slate-400"
-                                            }`}
+                                        disabled={commitDisabled}
+                                        className={
+                                            commitDisabled
+                                                ? "flex-1 rounded-xl py-3 font-bold text-xs transition-all shadow-md bg-slate-200 cursor-not-allowed shadow-none text-slate-400"
+                                                : "flex-1 rounded-xl py-3 font-bold text-xs text-white transition-all shadow-md bg-slate-900 hover:bg-slate-800"
+                                        }
                                     >
                                         Commit Configuration
                                     </button>
@@ -284,10 +401,11 @@ export default function ProfilePage() {
                                 <button
                                     onClick={handleFeedbackSubmit}
                                     disabled={feedbackSending || !feedbackText.trim()}
-                                    className={`inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-bold text-xs text-white transition-all shadow-md ${feedbackSending || !feedbackText.trim()
-                                        ? "bg-slate-200 cursor-not-allowed shadow-none text-slate-400"
-                                        : "bg-blue-600 hover:bg-blue-700"
-                                        }`}
+                                    className={
+                                        feedbackSending || !feedbackText.trim()
+                                            ? "inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-slate-200 cursor-not-allowed shadow-none text-slate-400"
+                                            : "inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-bold text-xs text-white transition-all shadow-md bg-blue-600 hover:bg-blue-700"
+                                    }
                                 >
                                     {feedbackSending ? "Sending..." : (
                                         <>
@@ -348,5 +466,5 @@ export default function ProfilePage() {
 
             </div>
         </div>
-    )
+    );
 }
