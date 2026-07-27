@@ -1,7 +1,5 @@
-// lib/firebase-client.ts
-
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -13,23 +11,25 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Sirf browser me hi Firebase initialize karo, build/server-side me nahi
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 
 if (typeof window !== "undefined") {
   if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-    console.error(
-      "❌ Firebase config missing! Check NEXT_PUBLIC_FIREBASE_* env vars in Vercel Settings → Environment Variables."
-    );
+    console.error("❌ Firebase config missing!");
   }
 
   app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+
+  // 🎯 PERSISTENCE — user rahega logged-in even after closing browser,
+  // until they explicitly click Logout.
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.error("Persistence setup error:", err);
+  });
 } else {
-  // Server-side / build-time placeholder — actual use client-side hi hoga
   app = {} as FirebaseApp;
   auth = {} as Auth;
   db = {} as Firestore;

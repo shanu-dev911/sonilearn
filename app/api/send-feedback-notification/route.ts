@@ -13,7 +13,6 @@ export async function POST(req: Request) {
     const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-    // Check if env variables are defined on Vercel
     if (!BOT_TOKEN || !CHAT_ID) {
       console.error("Missing Telegram Env Variables on Server!");
       return NextResponse.json(
@@ -22,7 +21,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const textMessage = `🚀 *New Feedback Received!*\n\n👤 *Name:* ${userName || "Student"}\n📧 *Email:* ${userEmail || "N/A"}\n💬 *Message:* ${message}`;
+    // Plain text — no Markdown, no emojis, avoids parse errors from special characters
+    const textMessage =
+      "New Feedback Received!\n\n" +
+      "Name: " + (userName || "Student") + "\n" +
+      "Email: " + (userEmail || "N/A") + "\n\n" +
+      "Message: " + message;
 
     const telegramUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
@@ -32,7 +36,6 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         chat_id: CHAT_ID,
         text: textMessage,
-        parse_mode: "Markdown",
       }),
     });
 
