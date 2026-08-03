@@ -34,8 +34,7 @@ interface BestUserEntry {
     accuracy: number;
     attempts: number;
 }
-
-export default function LeaderboardPage() {
+ export default function LeaderboardPage() {
 
     const router = useRouter();
 
