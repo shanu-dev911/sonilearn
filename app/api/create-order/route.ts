@@ -13,7 +13,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Checking keys with trim to avoid space issues
     const key_id = (
       process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID
     )?.trim();
@@ -32,10 +31,12 @@ export async function POST(req: Request) {
       key_secret: key_secret,
     });
 
+    // Safely trim receipt to stay well within Razorpay's 40-character limit
+    const safeUserId = String(userId).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
     const options = {
-      amount: Math.round(Number(amount) * 100), // Ensures it's converted to paise safely
+      amount: Math.round(Number(amount) * 100),
       currency: "INR",
-      receipt: `receipt_${userId.slice(0, 8)}_${Date.now()}`, // Shortened receipt ID for safety
+      receipt: `rcpt_${safeUserId}_${Date.now().toString().slice(-8)}`,
       notes: {
         userId: String(userId),
         userName: userName || "Student",
