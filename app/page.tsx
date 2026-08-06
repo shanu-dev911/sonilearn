@@ -3,18 +3,22 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
-import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck } from "lucide-react";
+import { checkTrialStatus } from "@/lib/trial-check";
+import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, Sparkles, X } from "lucide-react";
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("Student");
   const [targetExam, setTargetExam] = useState("Not Set");
   const [isPremium, setIsPremium] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -25,6 +29,7 @@ export default function Dashboard() {
 
           if (userSnap.exists()) {
             const data = userSnap.data();
+            setUserData(data);
             setUserName(data.name || user.displayName || "Student");
             setTargetExam(data.targetExam || "Not Set");
             setIsPremium(data.isPremium || false);
@@ -42,8 +47,50 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [router]);
 
+  // 🎯 Show welcome celebration if just came back from successful payment
+  useEffect(() => {
+    if (searchParams.get("upgraded") === "true") {
+      setShowWelcome(true);
+      // Clean the URL so refresh doesn't re-trigger it
+      window.history.replaceState({}, "", "/");
+
+      const timer = setTimeout(() => setShowWelcome(false), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
+  const trialStatus = userData ? checkTrialStatus(userData) : null;
+
   return (
     <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans selection:bg-blue-600 selection:text-white">
+
+      {/* 🎯 PREMIUM WELCOME CELEBRATION OVERLAY */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative animate-in fade-in zoom-in duration-300">
+            <button
+              onClick={() => setShowWelcome(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X size={18} />
+            </button>
+            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
+              <Crown size={32} className="text-white" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Welcome to Premium! 🎉</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">
+              Payment successful! You now have full access to every feature — Warrior Questions, unlimited Daily Challenge, Leaderboard, and more.
+            </p>
+            <button
+              onClick={() => setShowWelcome(false)}
+              className="w-full mt-6 bg-slate-900 text-white h-12 rounded-xl font-bold text-sm"
+            >
+              Let's Go 🚀
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* FIXED RESPONSIVE NAVBAR */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -72,15 +119,16 @@ export default function Dashboard() {
 
             {/* ACTION PIPELINE */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* FIXED DYNAMIC MEMBERSHIP BADGE */}
+              {/* 🎯 DYNAMIC MEMBERSHIP BADGE — Premium gets a distinct golden style */}
               <div
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${isPremium
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${
+                  isPremium
+                    ? "bg-gradient-to-r from-amber-400 to-amber-500 text-white border border-amber-300"
                     : "bg-blue-50 text-blue-700 border border-blue-200"
-                  }`}
+                }`}
               >
-                {isPremium ? <ShieldCheck size={10} className="sm:w-3 sm:h-3" /> : <Zap size={10} className="sm:w-3 sm:h-3" />}
-                <span>{isPremium ? "Paid" : "Free Tier"}</span>
+                {isPremium ? <Crown size={10} className="sm:w-3 sm:h-3" /> : <Zap size={10} className="sm:w-3 sm:h-3" />}
+                <span>{isPremium ? "Premium" : "Free Tier"}</span>
               </div>
 
               {!isPremium && (
@@ -107,13 +155,46 @@ export default function Dashboard() {
       {/* CONTAINER CONTROL */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
 
+        {/* 🎯 TRIAL BANNER — only shown to non-premium users who still have trial days left */}
+        {!isPremium && trialStatus && trialStatus.isTrialActive && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
+            <p className="text-blue-700 text-xs sm:text-sm font-bold">
+              🎁 {trialStatus.daysRemaining} day{trialStatus.daysRemaining !== 1 ? "s" : ""} left in your free trial
+            </p>
+            <button
+              onClick={() => router.push("/premium")}
+              className="text-blue-600 text-xs font-black underline flex-shrink-0"
+            >
+              Upgrade Now
+            </button>
+          </div>
+        )}
+
+        {/* 🎯 TRIAL EXPIRED BANNER */}
+        {!isPremium && trialStatus && !trialStatus.isTrialActive && (
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
+            <p className="text-rose-700 text-xs sm:text-sm font-bold">
+              ⏰ Your free trial has ended
+            </p>
+            <button
+              onClick={() => router.push("/premium")}
+              className="bg-rose-600 text-white text-xs font-black px-3 py-1.5 rounded-lg flex-shrink-0"
+            >
+              Upgrade — ₹49
+            </button>
+          </div>
+        )}
+
         {/* PREMIUM MINIMALIST BANNER */}
         <div className="relative overflow-hidden bg-slate-900 text-white rounded-[1.5rem] sm:rounded-[1.75rem] p-5 sm:p-8 md:p-10 shadow-xl border border-slate-800 mb-6 sm:mb-8">
           <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/40 via-transparent to-indigo-900/30 pointer-events-none" />
           <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5 sm:gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-white/10 text-blue-200 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest mb-3 sm:mb-4">
-                Workspace Active
+              <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[9px] sm:text-[10px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${
+                isPremium ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-blue-200"
+              }`}>
+                {isPremium && <Crown size={10} />}
+                {isPremium ? "Premium Workspace" : "Workspace Active"}
               </div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight">
                 Welcome , {userName}

@@ -348,7 +348,7 @@ export default function CompleteProfile() {
                                 {loading
                                     ? "Please wait..."
                                     : needsStageSelection
-                                        ? "Next →"
+                                        ? "Next"
                                         : "Start 🚀"}
 
                             </button>

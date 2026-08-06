@@ -53,7 +53,7 @@ export default function PremiumPage() {
                     setUserData(userSnap.data());
                 }
             } else {
-                router.push("/login");
+           router.push("/?upgraded=true");
             }
             setLoading(false);
         });
