@@ -30,10 +30,11 @@ export default function Dashboard() {
 
       if (userSnap.exists()) {
         const data = userSnap.data();
+        const premiumValue = checkTrialStatus(data).isPremium;
         setUserData(data);
         setUserName(data.name || currentUser.displayName || "Student");
         setTargetExam(data.targetExam || "Not Set");
-        setIsPremium(data.isPremium || false);
+        setIsPremium(premiumValue);
       } else {
         setUserName(currentUser.displayName || "Student");
       }

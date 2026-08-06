@@ -94,6 +94,7 @@ export default function PremiumPage() {
                 description: "Premium Access — Unlock All Features",
                 order_id: orderData.order.id,
                 handler: async function (response: any) {
+                    console.log("Razorpay success callback response:", response);
                     try {
                         const verifyRes = await fetch("/api/verify-payment", {
                             method: "POST",
@@ -106,13 +107,15 @@ export default function PremiumPage() {
                             }),
                         });
 
+                        console.log("Verify payment response status:", verifyRes.status);
                         const verifyData = await verifyRes.json();
+                        console.log("Verify payment body:", verifyData);
 
                         if (verifyData.success) {
                             alert("🎉 Payment successful! Premium activated.");
-                            router.replace("/?upgraded=true");
+                            window.location.href = "/?upgraded=true";
                         } else {
-                            alert("Payment verification failed. Please contact support.");
+                            alert(`Payment verification failed. ${verifyData.error || "Please contact support."}`);
                         }
                     } catch (err) {
                         console.error("Verification error:", err);
@@ -162,7 +165,16 @@ export default function PremiumPage() {
     }
 
     // 🎯 If already premium, show a simple confirmation instead of the pricing card
-    if (userData?.isPremium) {
+    const trialStatus = userData
+        ? checkTrialStatus(userData)
+        : {
+            isPremium: false,
+            isTrialActive: false,
+            hasAccess: false,
+            daysRemaining: 0,
+        };
+
+    if (trialStatus.isPremium) {
         return (
             <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
                 <div className="bg-white border border-slate-200 rounded-3xl p-8 max-w-md w-full text-center shadow-xl">
@@ -181,8 +193,6 @@ export default function PremiumPage() {
             </div>
         );
     }
-
-    const trialStatus = checkTrialStatus(userData);
 
     return (
         <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-32 font-sans antialiased selection:bg-blue-600 selection:text-white">

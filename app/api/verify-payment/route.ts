@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getDb } from "@/lib/firebase-admin";
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const PREMIUM_DAYS = 30;
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -37,10 +40,12 @@ export async function POST(req: Request) {
 
     // 🎯 SIGNATURE VALID — mark user as premium in Firestore
     const db = getDb();
+    const premiumExpiresAt = new Date(Date.now() + 30 * MS_PER_DAY).toISOString();
 
     await db.collection("users").doc(userId).update({
       isPremium: true,
       premiumSince: new Date().toISOString(),
+      premiumExpiresAt,
       lastPaymentId: razorpay_payment_id,
       lastOrderId: razorpay_order_id,
     });

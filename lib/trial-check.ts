@@ -1,8 +1,8 @@
-// 🎯 TRIAL CHECK UTILITY
-// Determines whether a user still has free-trial access or must upgrade.
-// Trial length is 3 days from account creation (signup date).
+// 🎯 TRIAL AND PREMIUM CHECK UTILITY
+// Determines whether a user still has free-trial access, active premium access, or must upgrade.
 
 const TRIAL_DAYS = 3;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 interface TrialStatus {
   isPremium: boolean;
@@ -11,19 +11,35 @@ interface TrialStatus {
   daysRemaining: number;
 }
 
-export function checkTrialStatus(userData: any): TrialStatus {
-  const isPremium = userData?.isPremium === true;
+function parseDate(value: any): Date | null {
+  if (!value) return null;
+  if (typeof value?.toDate === "function") {
+    return value.toDate();
+  }
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value?.seconds === "number") {
+    return new Date(value.seconds * 1000);
+  }
+  return null;
+}
 
-  if (isPremium) {
+export function checkTrialStatus(userData: any): TrialStatus {
+  const now = new Date();
+  const premiumExpiresAt = parseDate(userData?.premiumExpiresAt);
+
+  if (premiumExpiresAt && premiumExpiresAt.getTime() > now.getTime()) {
+    const msRemaining = premiumExpiresAt.getTime() - now.getTime();
     return {
       isPremium: true,
       isTrialActive: false,
       hasAccess: true,
-      daysRemaining: 0,
+      daysRemaining: Math.max(0, Math.ceil(msRemaining / MS_PER_DAY)),
     };
   }
 
-  // Determine signup date — supports Firestore Timestamp, ISO string, or missing
   let signupDate: Date | null = null;
 
   const rawCreatedAt = userData?.createdAt;
@@ -50,9 +66,8 @@ export function checkTrialStatus(userData: any): TrialStatus {
     };
   }
 
-  const now = new Date();
   const msElapsed = now.getTime() - signupDate.getTime();
-  const daysElapsed = msElapsed / (1000 * 60 * 60 * 24);
+  const daysElapsed = msElapsed / MS_PER_DAY;
 
   const daysRemaining = Math.max(0, Math.ceil(TRIAL_DAYS - daysElapsed));
   const isTrialActive = daysElapsed < TRIAL_DAYS;
