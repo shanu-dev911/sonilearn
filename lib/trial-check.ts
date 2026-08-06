@@ -6,6 +6,7 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 interface TrialStatus {
   isPremium: boolean;
+  isPremiumExpired: boolean;
   isTrialActive: boolean;
   hasAccess: boolean;
   daysRemaining: number;
@@ -30,36 +31,33 @@ export function checkTrialStatus(userData: any): TrialStatus {
   const now = new Date();
   const premiumExpiresAt = parseDate(userData?.premiumExpiresAt);
 
-  if (premiumExpiresAt && premiumExpiresAt.getTime() > now.getTime()) {
-    const msRemaining = premiumExpiresAt.getTime() - now.getTime();
+  if (userData?.isPremium === true) {
+    if (premiumExpiresAt && premiumExpiresAt.getTime() > now.getTime()) {
+      const msRemaining = premiumExpiresAt.getTime() - now.getTime();
+      return {
+        isPremium: true,
+        isPremiumExpired: false,
+        isTrialActive: false,
+        hasAccess: true,
+        daysRemaining: Math.max(0, Math.ceil(msRemaining / MS_PER_DAY)),
+      };
+    }
+
     return {
-      isPremium: true,
+      isPremium: false,
+      isPremiumExpired: true,
       isTrialActive: false,
-      hasAccess: true,
-      daysRemaining: Math.max(0, Math.ceil(msRemaining / MS_PER_DAY)),
+      hasAccess: false,
+      daysRemaining: 0,
     };
   }
 
-  let signupDate: Date | null = null;
+  const signupDate = parseDate(userData?.createdAt);
 
-  const rawCreatedAt = userData?.createdAt;
-
-  if (rawCreatedAt) {
-    if (typeof rawCreatedAt?.toDate === "function") {
-      // Firestore Timestamp object
-      signupDate = rawCreatedAt.toDate();
-    } else if (typeof rawCreatedAt === "string") {
-      signupDate = new Date(rawCreatedAt);
-    } else if (rawCreatedAt?.seconds) {
-      // Firestore Timestamp-like plain object
-      signupDate = new Date(rawCreatedAt.seconds * 1000);
-    }
-  }
-
-  if (!signupDate || isNaN(signupDate.getTime())) {
-    // Fallback — if we can't determine signup date, deny access safely
+  if (!signupDate) {
     return {
       isPremium: false,
+      isPremiumExpired: false,
       isTrialActive: false,
       hasAccess: false,
       daysRemaining: 0,
@@ -74,6 +72,7 @@ export function checkTrialStatus(userData: any): TrialStatus {
 
   return {
     isPremium: false,
+    isPremiumExpired: false,
     isTrialActive,
     hasAccess: isTrialActive,
     daysRemaining,

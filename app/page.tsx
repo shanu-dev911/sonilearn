@@ -47,10 +47,10 @@ export default function Dashboard() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         await fetchUserDocument(user);
-        setLoadingUserData(false);
       } else {
         router.push("/login");
       }
+      setLoadingUserData(false);
     });
 
     return () => unsubscribe();
@@ -212,8 +212,12 @@ export default function Dashboard() {
         )}
 
         {/* PREMIUM MINIMALIST BANNER */}
-        <div className="relative overflow-hidden bg-slate-900 text-white rounded-[1.5rem] sm:rounded-[1.75rem] p-5 sm:p-8 md:p-10 shadow-xl border border-slate-800 mb-6 sm:mb-8">
-          <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/40 via-transparent to-indigo-900/30 pointer-events-none" />
+        <div className={`relative overflow-hidden bg-slate-900 text-white rounded-[1.5rem] sm:rounded-[1.75rem] p-5 sm:p-8 md:p-10 shadow-xl border mb-6 sm:mb-8 ${isPremium ? "border-amber-400/40" : "border-slate-800"
+          }`}>
+          <div className={`absolute inset-0 pointer-events-none ${isPremium
+              ? "bg-gradient-to-tr from-amber-900/30 via-transparent to-amber-700/20"
+              : "bg-gradient-to-tr from-blue-900/40 via-transparent to-indigo-900/30"
+            }`} />
           <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5 sm:gap-6">
             <div>
               <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[9px] sm:text-[10px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${
@@ -229,9 +233,10 @@ export default function Dashboard() {
                 Your performance track is calibrated. Access your modules below to continue your dynamic assessment pipeline.
               </p>
             </div>
-            <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 min-w-[180px] sm:min-w-[200px] flex flex-col justify-center">
+            <div className={`border backdrop-blur-md rounded-2xl p-4 min-w-[180px] sm:min-w-[200px] flex flex-col justify-center ${isPremium ? "bg-amber-400/10 border-amber-400/20" : "bg-white/5 border-white/10"
+              }`}>
               <span className="text-[10px] sm:text-xs text-slate-400 font-semibold tracking-wider uppercase">Target Track</span>
-              <span className="text-lg sm:text-xl font-black mt-0.5 sm:text-white tracking-tight">{targetExam}</span>
+              <span className="text-lg sm:text-xl font-black mt-0.5 text-white tracking-tight">{targetExam}</span>
             </div>
           </div>
         </div>
@@ -339,7 +344,7 @@ export default function Dashboard() {
                 <Zap size={10} />Math/Reasoning
               </div>
               <h3 className="text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate">
-                   🎯 Warrior Battal Ground 
+                🎯 Warrior battal Questions
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs font-medium leading-normal">
                 Initiate a high-velocity -minute evaluation cycle for structural review.

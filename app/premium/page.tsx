@@ -169,6 +169,7 @@ export default function PremiumPage() {
         ? checkTrialStatus(userData)
         : {
             isPremium: false,
+            isPremiumExpired: false,
             isTrialActive: false,
             hasAccess: false,
             daysRemaining: 0,

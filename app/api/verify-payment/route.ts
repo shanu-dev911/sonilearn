@@ -19,8 +19,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing payment verification fields" }, { status: 400 });
     }
 
-    // 🎯 SIGNATURE VERIFICATION — confirms this payment genuinely came from Razorpay
-    // and was not tampered with, using our secret key to re-generate and compare.
     const body_to_sign = razorpay_order_id + "|" + razorpay_payment_id;
 
     const expectedSignature = crypto
@@ -38,14 +36,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🎯 SIGNATURE VALID — mark user as premium in Firestore
     const db = getDb();
-    const premiumExpiresAt = new Date(Date.now() + 30 * MS_PER_DAY).toISOString();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + PREMIUM_DAYS * MS_PER_DAY);
 
     await db.collection("users").doc(userId).update({
       isPremium: true,
-      premiumSince: new Date().toISOString(),
-      premiumExpiresAt,
+      premiumSince: now.toISOString(),
+      premiumExpiresAt: expiresAt.toISOString(),
       lastPaymentId: razorpay_payment_id,
       lastOrderId: razorpay_order_id,
     });
