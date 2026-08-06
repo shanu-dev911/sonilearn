@@ -110,7 +110,7 @@ export default function PremiumPage() {
 
                         if (verifyData.success) {
                             alert("🎉 Payment successful! Premium activated.");
-                            router.push("/");
+                            router.replace("/?upgraded=true");
                         } else {
                             alert("Payment verification failed. Please contact support.");
                         }

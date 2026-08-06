@@ -17,28 +17,36 @@ export default function Dashboard() {
   const [isPremium, setIsPremium] = useState(false);
   const [userData, setUserData] = useState<any>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [loadingUserData, setLoadingUserData] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const fetchUserDocument = async (currentUser: any) => {
+    if (!currentUser) return;
+
+    try {
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const userSnap = await getDoc(userDocRef);
+
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        setUserData(data);
+        setUserName(data.name || currentUser.displayName || "Student");
+        setTargetExam(data.targetExam || "Not Set");
+        setIsPremium(data.isPremium || false);
+      } else {
+        setUserName(currentUser.displayName || "Student");
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        try {
-          const userDocRef = doc(db, "users", user.uid);
-          const userSnap = await getDoc(userDocRef);
-
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            setUserData(data);
-            setUserName(data.name || user.displayName || "Student");
-            setTargetExam(data.targetExam || "Not Set");
-            setIsPremium(data.isPremium || false);
-          } else {
-            setUserName(user.displayName || "Student");
-          }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
+        await fetchUserDocument(user);
+        setLoadingUserData(false);
       } else {
         router.push("/login");
       }
@@ -51,6 +59,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (searchParams.get("upgraded") === "true") {
       setShowWelcome(true);
+
+      const refreshPremiumState = async () => {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          await fetchUserDocument(currentUser);
+        }
+      };
+
+      refreshPremiumState();
       // Clean the URL so refresh doesn't re-trigger it
       window.history.replaceState({}, "", "/");
 
@@ -60,6 +77,14 @@ export default function Dashboard() {
   }, [searchParams]);
 
   const trialStatus = userData ? checkTrialStatus(userData) : null;
+
+  if (loadingUserData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans selection:bg-blue-600 selection:text-white">
