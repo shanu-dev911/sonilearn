@@ -112,6 +112,11 @@ export default function PremiumPage() {
                         console.log("Verify payment body:", verifyData);
 
                         if (verifyData.success) {
+                            const userRef = doc(db, "users", user.uid);
+                            const refreshedUser = await getDoc(userRef);
+                            if (refreshedUser.exists()) {
+                                setUserData(refreshedUser.data());
+                            }
                             alert("🎉 Payment successful! Premium activated.");
                             window.location.href = "/?upgraded=true";
                         } else {
@@ -132,7 +137,7 @@ export default function PremiumPage() {
                     color: "#2563eb",
                 },
                 modal: {
-                    ondismiss: function () {
+                    onDismiss: function () {
                         setProcessing(false);
                     },
                 },
@@ -148,7 +153,7 @@ export default function PremiumPage() {
     };
 
     const features = [
-        { icon: Zap, text: " Warrior Battal Ground ", desc: "No cooling-down period between assessment cycles." },
+        { icon: Zap, text: " Warrior Battle Ground ", desc: "No cooling-down period between assessment cycles." },
         { icon: Trophy, text: "All India Leaderboard Matrix", desc: "Compare target scores across live peer metrics." },
 
         { icon: BarChart3, text: "Weak Topic Performance Analysis", desc: "Isolate structural evaluation errors instantly." },
@@ -241,7 +246,7 @@ export default function PremiumPage() {
                         transition={{ delay: 0.1 }}
                         className="mt-4 text-slate-400 text-sm sm:text-base max-w-xl mx-auto font-medium leading-relaxed"
                     >
-                        Deploy high-precision analytical tools, unlock elite database access metrics, and isolate score deficiencies on an unthrottled framework.
+                        Deploy high-precision analytical tools, unlock elite database access metrics, and isolate score deficiencies on an uninterrupted framework.
                     </motion.p>
 
                     {/* 🎯 TRIAL STATUS BANNER */}

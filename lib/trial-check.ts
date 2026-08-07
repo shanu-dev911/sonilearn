@@ -31,9 +31,11 @@ export function checkTrialStatus(userData: any): TrialStatus {
   const now = new Date();
   const premiumExpiresAt = parseDate(userData?.premiumExpiresAt);
 
-  if (userData?.isPremium === true) {
-    if (premiumExpiresAt && premiumExpiresAt.getTime() > now.getTime()) {
-      const msRemaining = premiumExpiresAt.getTime() - now.getTime();
+  const hasValidPremiumExpiry = premiumExpiresAt && premiumExpiresAt.getTime() > now.getTime();
+
+  if (userData?.isPremium === true || hasValidPremiumExpiry) {
+    if (hasValidPremiumExpiry) {
+      const msRemaining = premiumExpiresAt!.getTime() - now.getTime();
       return {
         isPremium: true,
         isPremiumExpired: false,
@@ -43,6 +45,16 @@ export function checkTrialStatus(userData: any): TrialStatus {
       };
     }
 
+    return {
+      isPremium: true,
+      isPremiumExpired: false,
+      isTrialActive: false,
+      hasAccess: true,
+      daysRemaining: 0,
+    };
+  }
+
+  if (premiumExpiresAt && premiumExpiresAt.getTime() <= now.getTime()) {
     return {
       isPremium: false,
       isPremiumExpired: true,

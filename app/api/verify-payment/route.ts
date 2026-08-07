@@ -40,13 +40,17 @@ export async function POST(req: Request) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + PREMIUM_DAYS * MS_PER_DAY);
 
-    await db.collection("users").doc(userId).update({
-      isPremium: true,
-      premiumSince: now.toISOString(),
-      premiumExpiresAt: expiresAt.toISOString(),
-      lastPaymentId: razorpay_payment_id,
-      lastOrderId: razorpay_order_id,
-    });
+    await db.collection("users").doc(userId).set(
+      {
+        isPremium: true,
+        premiumSince: now.toISOString(),
+        premiumExpiresAt: expiresAt.toISOString(),
+        lastPaymentId: razorpay_payment_id,
+        lastOrderId: razorpay_order_id,
+        updatedAt: now.toISOString(),
+      },
+      { merge: true }
+    );
 
     return NextResponse.json({ success: true, message: "Payment verified, premium activated" });
   } catch (error: any) {
