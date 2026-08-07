@@ -28,11 +28,18 @@ export default function DoubtSolverPage() {
         if (fileInputRef.current) fileInputRef.current.value = "";
     }
 
-    function fileToBase64(file) {
-        return new Promise((resolve, reject) => {
+    function fileToBase64(file: File) {
+        return new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(",")[1]); // strip data: prefix
-            reader.onerror = reject;
+            reader.onload = () => {
+                const result = reader.result;
+                if (typeof result === "string") {
+                    resolve(result.split(",")[1]);
+                } else {
+                    reject(new Error("Failed to read file as string."));
+                }
+            };
+            reader.onerror = () => reject(new Error("Failed to read file."));
             reader.readAsDataURL(file);
         });
     }
