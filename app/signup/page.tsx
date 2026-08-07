@@ -67,6 +67,8 @@ export default function SignupPage() {
                     photoURL: user.photoURL || "",
                     targetExam: "",
                     isPremium: false,
+                    isSubscribed: false,
+                    subscriptionStatus: "inactive",
                     profileCompleted: false,
                     createdAt: serverTimestamp(),
                 });

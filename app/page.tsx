@@ -47,10 +47,10 @@ export default function Dashboard() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         await fetchUserDocument(user);
+        setLoadingUserData(false);
       } else {
         router.push("/login");
       }
-      setLoadingUserData(false);
     });
 
     return () => unsubscribe();
@@ -160,7 +160,7 @@ export default function Dashboard() {
               {!isPremium && (
                 <button
                   onClick={() => router.push("/premium")}
-                  className="relative group overflow-hidden flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-900 text-white text-[10px] sm:text-xs font-semibold hover:bg-slate-800 transition-all duration-300 shadow-md active:scale-98 whitespace-nowrap"
+                  className="relative group overflow-hidden flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-900 text-white text-[10px] sm:text-xs font-semibold hover:bg-slate-800 transition-all duration-300 shadow-md active:scale-95 whitespace-nowrap"
                 >
                   <Rocket size={11} className="text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform hidden sm:inline" />
                   <span>Upgrade</span>
@@ -212,12 +212,8 @@ export default function Dashboard() {
         )}
 
         {/* PREMIUM MINIMALIST BANNER */}
-        <div className={`relative overflow-hidden bg-slate-900 text-white rounded-[1.5rem] sm:rounded-[1.75rem] p-5 sm:p-8 md:p-10 shadow-xl border mb-6 sm:mb-8 ${isPremium ? "border-amber-400/40" : "border-slate-800"
-          }`}>
-          <div className={`absolute inset-0 pointer-events-none ${isPremium
-              ? "bg-gradient-to-tr from-amber-900/30 via-transparent to-amber-700/20"
-              : "bg-gradient-to-tr from-blue-900/40 via-transparent to-indigo-900/30"
-            }`} />
+        <div className="relative overflow-hidden bg-slate-900 text-white rounded-[1.5rem] sm:rounded-[1.75rem] p-5 sm:p-8 md:p-10 shadow-xl border border-slate-800 mb-6 sm:mb-8">
+          <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/40 via-transparent to-indigo-900/30 pointer-events-none" />
           <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5 sm:gap-6">
             <div>
               <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[9px] sm:text-[10px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${
@@ -233,10 +229,9 @@ export default function Dashboard() {
                 Your performance track is calibrated. Access your modules below to continue your dynamic assessment pipeline.
               </p>
             </div>
-            <div className={`border backdrop-blur-md rounded-2xl p-4 min-w-[180px] sm:min-w-[200px] flex flex-col justify-center ${isPremium ? "bg-amber-400/10 border-amber-400/20" : "bg-white/5 border-white/10"
-              }`}>
+            <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 min-w-[180px] sm:min-w-[200px] flex flex-col justify-center">
               <span className="text-[10px] sm:text-xs text-slate-400 font-semibold tracking-wider uppercase">Target Track</span>
-              <span className="text-lg sm:text-xl font-black mt-0.5 text-white tracking-tight">{targetExam}</span>
+              <span className="text-lg sm:text-xl font-black mt-0.5 sm:text-white tracking-tight">{targetExam}</span>
             </div>
           </div>
         </div>
@@ -351,7 +346,7 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="bg-slate-950 text-white group-hover:bg-blue-600 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl font-bold text-xs shadow-md transition-all whitespace-nowrap align-self-stretch text-center sm:self-auto flex items-center justify-center gap-1.5 w-full sm:w-auto mt-2 sm:mt-0">
+          <div className="bg-slate-950 text-white group-hover:bg-blue-600 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl font-bold text-xs shadow-md transition-all whitespace-nowrap self-stretch text-center sm:self-auto flex items-center justify-center gap-1.5 w-full sm:w-auto mt-2 sm:mt-0">
             Start <ArrowUpRight size={14} />
           </div>
         </button>

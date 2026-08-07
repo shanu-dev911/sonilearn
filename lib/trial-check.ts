@@ -33,6 +33,7 @@ export function checkTrialStatus(userData: any): TrialStatus {
 
   const hasValidPremiumExpiry = premiumExpiresAt && premiumExpiresAt.getTime() > now.getTime();
 
+  // ✅ Premium if either the isPremium flag is set, OR expiry date is still valid
   if (userData?.isPremium === true || hasValidPremiumExpiry) {
     if (hasValidPremiumExpiry) {
       const msRemaining = premiumExpiresAt!.getTime() - now.getTime();
@@ -54,6 +55,7 @@ export function checkTrialStatus(userData: any): TrialStatus {
     };
   }
 
+  // ⏰ Premium had an expiry date and it has passed
   if (premiumExpiresAt && premiumExpiresAt.getTime() <= now.getTime()) {
     return {
       isPremium: false,
@@ -64,9 +66,24 @@ export function checkTrialStatus(userData: any): TrialStatus {
     };
   }
 
-  const signupDate = parseDate(userData?.createdAt);
+  // 🎁 No premium — check free trial based on signup date
+  let signupDate: Date | null = null;
+  const rawCreatedAt = userData?.createdAt;
 
-  if (!signupDate) {
+  if (rawCreatedAt) {
+    if (typeof rawCreatedAt?.toDate === "function") {
+      // Firestore Timestamp object
+      signupDate = rawCreatedAt.toDate();
+    } else if (typeof rawCreatedAt === "string") {
+      signupDate = new Date(rawCreatedAt);
+    } else if (rawCreatedAt?.seconds) {
+      // Firestore Timestamp-like plain object
+      signupDate = new Date(rawCreatedAt.seconds * 1000);
+    }
+  }
+
+  if (!signupDate || isNaN(signupDate.getTime())) {
+    // Fallback — if we can't determine signup date, deny access safely
     return {
       isPremium: false,
       isPremiumExpired: false,
