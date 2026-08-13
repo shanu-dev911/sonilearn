@@ -31,6 +31,20 @@ export function checkTrialStatus(userData: any): TrialStatus {
   const now = new Date();
   const premiumExpiresAt = parseDate(userData?.premiumExpiresAt);
 
+  // ⏰ EXPIRY CHECK FIRST — if an expiry date exists and has passed, the user
+  // is expired NO MATTER what the isPremium boolean still says in Firestore.
+  // This is what makes automatic expiry actually work without anyone having
+  // to manually flip isPremium back to false every time a plan runs out.
+  if (premiumExpiresAt && premiumExpiresAt.getTime() <= now.getTime()) {
+    return {
+      isPremium: false,
+      isPremiumExpired: true,
+      isTrialActive: false,
+      hasAccess: false,
+      daysRemaining: 0,
+    };
+  }
+
   const hasValidPremiumExpiry = premiumExpiresAt && premiumExpiresAt.getTime() > now.getTime();
 
   // ✅ Premium if either the isPremium flag is set, OR expiry date is still valid
@@ -51,17 +65,6 @@ export function checkTrialStatus(userData: any): TrialStatus {
       isPremiumExpired: false,
       isTrialActive: false,
       hasAccess: true,
-      daysRemaining: 0,
-    };
-  }
-
-  // ⏰ Premium had an expiry date and it has passed
-  if (premiumExpiresAt && premiumExpiresAt.getTime() <= now.getTime()) {
-    return {
-      isPremium: false,
-      isPremiumExpired: true,
-      isTrialActive: false,
-      hasAccess: false,
       daysRemaining: 0,
     };
   }
