@@ -8,6 +8,7 @@ import { db, auth } from "@/lib/firebase-client";
 
 import {
     collection,
+    doc,
     query,
     orderBy,
     limit,
@@ -15,7 +16,8 @@ import {
 } from "firebase/firestore";
 
 import { onAuthStateChanged, User } from "firebase/auth";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock, Crown } from "lucide-react";
+import { checkTrialStatus } from "@/lib/trial-check";
 
 interface LeaderboardEntry {
     id: string;
@@ -34,7 +36,10 @@ interface BestUserEntry {
     accuracy: number;
     attempts: number;
 }
- export default function LeaderboardPage() {
+
+type Access = "checking" | "locked" | "unlocked";
+
+export default function LeaderboardPage() {
 
     const router = useRouter();
 
@@ -49,13 +54,46 @@ interface BestUserEntry {
 
     const [totalCount, setTotalCount] = useState(0);
 
+    const [access, setAccess] = useState<Access>("checking");
+
     const currentUserRef = useRef<User | null>(null);
 
+    // 🔒 ACCESS CHECK — Leaderboard is premium/trial-gated content.
     useEffect(() => {
+        let unsubUser: (() => void) | null = null;
 
         const unsubAuth = onAuthStateChanged(auth, (user) => {
             currentUserRef.current = user;
+
+            if (unsubUser) {
+                unsubUser();
+                unsubUser = null;
+            }
+
+            if (!user) {
+                setAccess("locked");
+                return;
+            }
+
+            const userRef = doc(db, "users", user.uid);
+            unsubUser = onSnapshot(
+                userRef,
+                (snap) => {
+                    const userData = snap.exists() ? snap.data() : null;
+                    const trialStatus = checkTrialStatus(userData);
+                    setAccess(trialStatus.hasAccess ? "unlocked" : "locked");
+                },
+                () => setAccess("locked")
+            );
         });
+
+        return () => {
+            unsubAuth();
+            if (unsubUser) unsubUser();
+        };
+    }, []);
+
+    useEffect(() => {
 
         const q = query(
             collection(db, "exam_results"),
@@ -201,7 +239,6 @@ interface BestUserEntry {
         );
 
         return () => {
-            unsubAuth();
             unsubSnapshot();
         };
 
@@ -210,7 +247,37 @@ interface BestUserEntry {
     const userInTop50 =
         userRank !== null && userRank.rank <= 50;
 
-    if (loading) {
+    // 🔒 LOCKED — trial ended, not premium (checked first, before loading spinner)
+    if (access === "locked") {
+        return (
+            <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
+                <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-7 shadow-xl text-center">
+                    <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
+                        <Lock size={26} className="text-white" />
+                    </div>
+                    <h1 className="text-xl font-black text-slate-900">Leaderboard is Premium</h1>
+                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                        Your free trial has ended. Unlock the National Leaderboard, Warrior Battleground, and every premium feature with SoniLearn Premium.
+                    </p>
+
+                    <button
+                        onClick={() => router.push("/premium")}
+                        className="w-full mt-6 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold h-12 rounded-xl text-sm shadow-md flex items-center justify-center gap-2"
+                    >
+                        <Crown size={16} /> Unlock Premium — ₹49/month
+                    </button>
+                    <button
+                        onClick={() => router.push("/")}
+                        className="w-full mt-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold h-11 rounded-xl text-xs uppercase tracking-wider"
+                    >
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (access === "checking" || loading) {
 
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">

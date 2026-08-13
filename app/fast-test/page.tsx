@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, XCircle, BookOpen, RotateCcw, Timer, Flag, ArrowRight } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, RotateCcw, Timer, Flag, ArrowRight, Lock, Crown } from "lucide-react";
 import {
   collection,
   doc,
@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase-client";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { checkTrialStatus } from "@/lib/trial-check";
 
 type Question = {
   id: string;
@@ -30,7 +31,7 @@ type Question = {
   subject?: string;
 };
 
-type Phase = "loading" | "subject-select" | "quiz" | "submitting" | "result";
+type Phase = "loading" | "locked" | "subject-select" | "quiz" | "submitting" | "result";
 
 const TOTAL_QUESTIONS = 30;
 const TIMER_SECONDS = 30 * 60; // 30 minutes
@@ -116,7 +117,7 @@ export default function FastTestPage() {
   const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
   const [score, setScore] = useState(0);
 
-  // LOAD TARGET EXAM
+  // LOAD TARGET EXAM + CHECK PREMIUM/TRIAL ACCESS
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -134,7 +135,19 @@ export default function FastTestPage() {
           setPhase("result");
           return;
         }
-        const exam = snap.data()?.targetExam?.trim();
+
+        const data = snap.data();
+
+        // 🔒 PAYWALL — Warrior Battleground is premium/trial-gated content.
+        // If the free trial has ended and the user isn't premium, lock this
+        // page entirely instead of loading any questions.
+        const trialStatus = checkTrialStatus(data);
+        if (!trialStatus.hasAccess) {
+          setPhase("locked");
+          return;
+        }
+
+        const exam = data?.targetExam?.trim();
         if (!exam) {
           setError("Target exam not set. Please update your profile.");
           setPhase("result");
@@ -386,6 +399,36 @@ export default function FastTestPage() {
         <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
           Assembling Warrior Questions...
         </p>
+      </div>
+    );
+  }
+
+  // 🔒 LOCKED — trial ended, not premium
+  if (phase === "locked") {
+    return (
+      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-7 shadow-xl text-center">
+          <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
+            <Lock size={26} className="text-white" />
+          </div>
+          <h1 className="text-xl font-black text-slate-900">Warrior Battleground is Premium</h1>
+          <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+            Your free trial has ended. Unlock unlimited Warrior Battleground rounds, the Leaderboard, and every premium feature with SoniLearn Premium.
+          </p>
+
+          <button
+            onClick={() => router.push("/premium")}
+            className="w-full mt-6 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold h-12 rounded-xl text-sm shadow-md flex items-center justify-center gap-2"
+          >
+            <Crown size={16} /> Unlock Premium — ₹49/month
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className="w-full mt-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold h-11 rounded-xl text-xs uppercase tracking-wider"
+          >
+            Go Back
+          </button>
+        </div>
       </div>
     );
   }
