@@ -9,7 +9,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
 import { checkTrialStatus } from "@/lib/trial-check";
-import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, ScrollText, X } from "lucide-react";
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("Student");
@@ -98,7 +98,7 @@ export default function Dashboard() {
               onClick={() => setShowWelcome(false)}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
             <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
               <Crown size={32} className="text-white" />
@@ -253,7 +253,7 @@ export default function Dashboard() {
         </div>
 
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 mb-6">
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
 
           {/* DAILY CHALLENGE CARD */}
           <button
@@ -300,6 +300,28 @@ export default function Dashboard() {
               </p>
             </div>
           </button>
+          {/* PYQ PRACTICE CARD */}
+<button
+  onClick={() => router.push("/pyq")}
+  className="group relative bg-white border border-slate-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
+>
+  <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
+    <div className="bg-indigo-50 text-indigo-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+      <ScrollText size={20} className="sm:w-6 sm:h-6" />
+    </div>
+    <div className="text-slate-300 group-hover:text-blue-600 transition-colors">
+      <ArrowUpRight size={18} className="sm:w-5 sm:h-5" />
+    </div>
+  </div>
+  <div>
+    <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+      PYQ Practice
+    </h3>
+    <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
+      Previous year mixed questions across every subject — fresh random set every attempt.
+    </p>
+                            </div>
+                           </button>
 
           {/* LEADERBOARD CARD */}
           <button
