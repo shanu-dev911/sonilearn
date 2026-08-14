@@ -6,30 +6,44 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Timer, CheckCircle2, XCircle, ArrowRight, RotateCcw, Home, Award } from "lucide-react";
 
-// 🎯 Mock Questions Data (Aap isko apne Firebase ya database se bhi connect kar sakte hain)
+// 🎯 Bilingual Mock Questions Data (Hindi & English)
 const CURRENT_AFFAIRS_QUESTIONS = [
     {
         id: 1,
-        question: "Which country recently launched the world's first commercial wooden satellite?",
-        options: ["Japan", "United States", "India", "Germany"],
+        question: "Which country recently launched the world's first commercial wooden satellite?\nकिस देश ने हाल ही में दुनिया का पहला व्यावसायिक लकड़ी का उपग्रह लॉन्च किया है?",
+        options: [
+            "Japan / जापान",
+            "United States / संयुक्त राज्य अमेरिका",
+            "India / भारत",
+            "Germany / जर्मनी"
+        ],
         correctAnswer: 0,
-        explanation: "Japan launched LignoSat, developed by Kyoto University and Sumitomo Forestry, making it the world's first wooden satellite to test the use of timber in space."
+        explanation: "English: Japan launched LignoSat, the world's first wooden satellite.\nHindi: जापान ने दुनिया का पहला लकड़ी का उपग्रह 'लिग्नोसैट' लॉन्च किया है।"
     },
     {
         id: 2,
-        question: "What is the primary objective of India's Gaganyaan mission?",
-        options: ["Mars Orbiter Landing", "Human Spaceflight to Low Earth Orbit", "Lunar South Pole Exploration", "Solar Corona Study"],
+        question: "What is the primary objective of India's Gaganyaan mission?\nभारत के गगनयान मिशन का मुख्य उद्देश्य क्या है?",
+        options: [
+            "Mars Orbiter Landing / मंगल ग्रह पर लैंडिंग",
+            "Human Spaceflight to Low Earth Orbit / कम पृथ्वी की कक्षा में मानव अंतरिक्ष उड़ान",
+            "Lunar South Pole Exploration / चंद्रमा के दक्षिणी ध्रुव की खोज",
+            "Solar Corona Study / सौर कोरोना अध्ययन"
+        ],
         correctAnswer: 1,
-        explanation: "Gaganyaan is India's first human spaceflight mission aiming to send a crew of astronauts into low Earth orbit."
+        explanation: "English: Gaganyaan is India's first human spaceflight mission to low Earth orbit.\nHindi: गगनयान भारत का पहला मानव अंतरिक्ष उड़ान मिशन है जो अंतरिक्ष यात्रियों को पृथ्वी की निचली कक्षा में भेजेगा।"
     },
     {
         id: 3,
-        question: "Which city hosted the Summer Olympic Games?",
-        options: ["Tokyo", "Paris", "Los Angeles", "Brisbane"],
+        question: "Which city hosted the Summer Olympic Games?\nग्रीष्मकालीन ओलंपिक खेलों की मेजबानी किस शहर ने की थी?",
+        options: [
+            "Tokyo / टोक्यो",
+            "Paris / पेरिस",
+            "Los Angeles / लॉस एंजिल्स",
+            "Brisbane / ब्रिस्बेन"
+        ],
         correctAnswer: 1,
-        explanation: "Paris, France hosted the Summer Olympic Games, showcasing exceptional athletic performances worldwide."
-    },
-    // Note: Aap yahan baaki 27 questions aur add kar sakte hain taaki total 30 ho jayein.
+        explanation: "English: Paris, France hosted the Summer Olympic Games.\nHindi: पेरिस, फ्रांस ने ग्रीष्मकालीन ओलंपिक खेलों की मेजबानी की थी।"
+    }
 ];
 
 export default function CurrentAffairsTest() {
@@ -37,10 +51,9 @@ export default function CurrentAffairsTest() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: number }>({});
     const [showResults, setShowResults] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 Minutes in seconds
+    const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 Minutes
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    // ⏱️ 30-Minute Countdown Timer
     useEffect(() => {
         if (showResults || isSubmitted) return;
 
@@ -65,7 +78,7 @@ export default function CurrentAffairsTest() {
     };
 
     const handleOptionSelect = (optionIndex: number) => {
-        if (selectedAnswers[currentIndex] !== undefined) return; // Lock option after selection to show instant result
+        if (selectedAnswers[currentIndex] !== undefined) return;
         setSelectedAnswers({
             ...selectedAnswers,
             [currentIndex]: optionIndex
@@ -81,7 +94,6 @@ export default function CurrentAffairsTest() {
     const userSelectedOpt = selectedAnswers[currentIndex];
     const hasAnswered = userSelectedOpt !== undefined;
 
-    // Calculate score
     const calculateScore = () => {
         let score = 0;
         CURRENT_AFFAIRS_QUESTIONS.forEach((q, idx) => {
@@ -103,8 +115,8 @@ export default function CurrentAffairsTest() {
                     <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
                         <Award size={40} />
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Test Completed! 🎉</h1>
-                    <p className="text-slate-500 text-sm mb-6">Here is your performance breakdown for Current Affairs.</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Test Completed! / परीक्षा समाप्त! 🎉</h1>
+                    <p className="text-slate-500 text-sm mb-6">Here is your performance breakdown.</p>
 
                     <div className="grid grid-cols-3 gap-3 mb-8">
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -148,11 +160,10 @@ export default function CurrentAffairsTest() {
 
     return (
         <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-20 font-sans">
-            {/* Top Header with Timer */}
             <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200">
                 <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div>
-                        <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Current Affairs Test</h1>
+                        <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Current Affairs (ससामयिक)</h1>
                         <p className="text-xs text-slate-500 font-medium">Question {currentIndex + 1} of {CURRENT_AFFAIRS_QUESTIONS.length}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl font-mono font-bold text-sm shadow-md">
@@ -162,10 +173,9 @@ export default function CurrentAffairsTest() {
                 </div>
             </header>
 
-            {/* Main Question Container */}
             <main className="max-w-3xl mx-auto px-4 pt-8">
                 <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-6 leading-relaxed">
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-6 leading-relaxed whitespace-pre-line">
                         {currentIndex + 1}. {currentQ.question}
                     </h2>
 
@@ -198,15 +208,13 @@ export default function CurrentAffairsTest() {
                         })}
                     </div>
 
-                    {/* Instant Explanation Box */}
                     {hasAnswered && (
                         <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-5 mb-8 animate-in fade-in duration-300">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-1">Explanation</h4>
-                            <p className="text-slate-700 text-sm leading-relaxed">{currentQ.explanation}</p>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-1">Explanation / स्पष्टीकरण</h4>
+                            <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">{currentQ.explanation}</p>
                         </div>
                     )}
 
-                    {/* Navigation Controls */}
                     <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                         <button
                             onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}

@@ -151,15 +151,16 @@ export default function PremiumPage() {
             setProcessing(false);
         }
     };
-
     const features = [
         { icon: Zap, text: " Warrior Battle Ground ", desc: "No cooling-down period between assessment cycles." },
         { icon: Trophy, text: "All India Leaderboard Matrix", desc: "Compare target scores across live peer metrics." },
-
+        { icon: ScrollText, text: "PYQ Practice", desc: "Previous year mixed questions across every subject with instant review." },
+        { icon: Newspaper, text: "Current Affairs", desc: "Stay updated with a dedicated set of 20 high-yield current affairs questions." },
         { icon: BarChart3, text: "Weak Topic Performance Analysis", desc: "Isolate structural evaluation errors instantly." },
         { icon: ShieldCheck, text: "100% Ad-Free Experience", desc: "Zero telemetry distraction during test execution." },
         { icon: CheckCircle2, text: "Daily Premium Challenge Access", desc: "Execute hyper-focused exclusive daily items." },
     ];
+    
 
     if (loading) {
         return (
@@ -208,7 +209,7 @@ export default function PremiumPage() {
                     onClick={() => router.push("/")}
                     className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors bg-white hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-200/60 shadow-sm"
                 >
-                    <ArrowLeft size={14} /> Back to Space
+                    <ArrowLeft size={14} /> Back
                 </button>
             </div>
 
