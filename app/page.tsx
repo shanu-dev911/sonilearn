@@ -147,11 +147,10 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 sm:gap-3">
               {/* 🎯 DYNAMIC MEMBERSHIP BADGE */}
               <div
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${
-                  isPremium
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${isPremium
                     ? "bg-gradient-to-r from-amber-400 to-amber-500 text-white border border-amber-300"
                     : "bg-blue-50 text-blue-700 border border-blue-200"
-                }`}
+                  }`}
               >
                 {isPremium ? <Crown size={10} className="sm:w-3 sm:h-3" /> : <Zap size={10} className="sm:w-3 sm:h-3" />}
                 <span>{isPremium ? "Premium" : "Free Tier"}</span>
@@ -216,9 +215,8 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/40 via-transparent to-indigo-900/30 pointer-events-none" />
           <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5 sm:gap-6">
             <div>
-              <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[9px] sm:text-[10px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${
-                isPremium ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-blue-200"
-              }`}>
+              <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[9px] sm:text-[10px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isPremium ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-blue-200"
+                }`}>
                 {isPremium && <Crown size={10} />}
                 {isPremium ? "Premium Workspace" : "Workspace Active"}
               </div>
@@ -253,7 +251,7 @@ export default function Dashboard() {
         </div>
 
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
 
           {/* DAILY CHALLENGE CARD */}
           <button
