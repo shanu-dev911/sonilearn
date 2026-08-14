@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
     Crown, Sparkles, Zap, Trophy, BookOpen,
-    BarChart3, ShieldCheck, CheckCircle2, ArrowLeft, ShieldAlert, Loader2
+    BarChart3, ShieldCheck, CheckCircle2, ArrowLeft, ShieldAlert, Loader2,
+    ScrollText, Newspaper
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase-client";
@@ -53,7 +54,7 @@ export default function PremiumPage() {
                     setUserData(userSnap.data());
                 }
             } else {
-           router.push("/?upgraded=true");
+                router.push("/?upgraded=true");
             }
             setLoading(false);
         });
@@ -160,7 +161,7 @@ export default function PremiumPage() {
         { icon: ShieldCheck, text: "100% Ad-Free Experience", desc: "Zero telemetry distraction during test execution." },
         { icon: CheckCircle2, text: "Daily Premium Challenge Access", desc: "Execute hyper-focused exclusive daily items." },
     ];
-    
+
 
     if (loading) {
         return (
