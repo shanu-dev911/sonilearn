@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
 import { checkTrialStatus } from "@/lib/trial-check";
-import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, ScrollText, X } from "lucide-react";
+import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, ScrollText, Newspaper, X } from "lucide-react";
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("Student");
@@ -145,7 +145,7 @@ export default function Dashboard() {
 
             {/* ACTION PIPELINE */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* 🎯 DYNAMIC MEMBERSHIP BADGE — Premium gets a distinct golden style */}
+              {/* 🎯 DYNAMIC MEMBERSHIP BADGE */}
               <div
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${
                   isPremium
@@ -181,7 +181,7 @@ export default function Dashboard() {
       {/* CONTAINER CONTROL */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
 
-        {/* 🎯 TRIAL BANNER — only shown to non-premium users who still have trial days left */}
+        {/* 🎯 TRIAL BANNER */}
         {!isPremium && trialStatus && trialStatus.isTrialActive && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
             <p className="text-blue-700 text-xs sm:text-sm font-bold">
@@ -253,7 +253,7 @@ export default function Dashboard() {
         </div>
 
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
 
           {/* DAILY CHALLENGE CARD */}
           <button
@@ -300,28 +300,52 @@ export default function Dashboard() {
               </p>
             </div>
           </button>
+
           {/* PYQ PRACTICE CARD */}
-<button
-  onClick={() => router.push("/pyq")}
-  className="group relative bg-white border border-slate-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
->
-  <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
-    <div className="bg-indigo-50 text-indigo-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-      <ScrollText size={20} className="sm:w-6 sm:h-6" />
-    </div>
-    <div className="text-slate-300 group-hover:text-blue-600 transition-colors">
-      <ArrowUpRight size={18} className="sm:w-5 sm:h-5" />
-    </div>
-  </div>
-  <div>
-    <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-      PYQ Practice
-    </h3>
-    <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-      Previous year mixed questions across every subject — fresh random set every attempt.
-    </p>
-                            </div>
-                           </button>
+          <button
+            onClick={() => router.push("/pyq")}
+            className="group relative bg-white border border-slate-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
+          >
+            <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
+              <div className="bg-indigo-50 text-indigo-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                <ScrollText size={20} className="sm:w-6 sm:h-6" />
+              </div>
+              <div className="text-slate-300 group-hover:text-blue-600 transition-colors">
+                <ArrowUpRight size={18} className="sm:w-5 sm:h-5" />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                PYQ Practice
+              </h3>
+              <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
+                Previous year mixed questions across every subject — fresh random set every attempt.
+              </p>
+            </div>
+          </button>
+
+          {/* CURRENT AFFAIRS CARD (ADDED) */}
+          <button
+            onClick={() => router.push("/current-affairs")}
+            className="group relative bg-white border border-slate-200 hover:border-emerald-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
+          >
+            <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
+              <div className="bg-emerald-50 text-emerald-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                <Newspaper size={20} className="sm:w-6 sm:h-6" />
+              </div>
+              <div className="text-slate-300 group-hover:text-emerald-600 transition-colors">
+                <ArrowUpRight size={18} className="sm:w-5 sm:h-5" />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                Current Affairs
+              </h3>
+              <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
+                Stay updated with a dedicated set of 20 high-yield current affairs questions.
+              </p>
+            </div>
+          </button>
 
           {/* LEADERBOARD CARD */}
           <button
@@ -364,7 +388,7 @@ export default function Dashboard() {
                 🎯 Warrior Battle Questions
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs font-medium leading-normal">
-                Initiate a high-velocity -minute evaluation cycle for structural review.
+                Initiate a high-velocity evaluation cycle for structural review.
               </p>
             </div>
           </div>
