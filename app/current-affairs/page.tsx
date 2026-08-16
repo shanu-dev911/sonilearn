@@ -2,34 +2,36 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from "react";
+import {
+    useEffect,
+    useState,
+    useRef,
+    useMemo,
+} from "react";
+
 import { useRouter } from "next/navigation";
-import { db, auth } from "@/lib/firebase-client";
+
+import {
+    db,
+    auth,
+} from "@/lib/firebase-client";
+
 import {
     collection,
     doc,
     getDocs,
     addDoc,
     query,
+    serverTimestamp,
     where,
     limit,
-    serverTimestamp,
+    writeBatch,
 } from "firebase/firestore";
-import { useAuthState } from "react-firebase-hooks/auth";
-import {
-    Timer,
-    CheckCircle2,
-    XCircle,
-    ArrowRight,
-    ArrowLeft,
-    RotateCcw,
-    Home,
-    Award,
-    Newspaper,
-    BookOpen,
-} from "lucide-react";
 
-type Question = {
+import { useAuthState } from "react-firebase-hooks/auth";
+import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, Newspaper } from "lucide-react";
+
+interface Question {
     id: string;
     questionEn: string;
     questionHi: string;
@@ -39,30 +41,23 @@ type Question = {
     explanationEn?: string;
     explanationHi?: string;
     subject?: string;
-};
+}
 
-type Phase = "loading" | "subject-select" | "quiz" | "submitting" | "result";
+type Phase = "loading" | "intro" | "quiz" | "submitting" | "result";
 
-const TOTAL_QUESTIONS = 25;
-const TIMER_SECONDS = 20 * 60;
+const TOTAL_QUESTIONS = 10;
+const TIMER_SECONDS = 10 * 60; // 10 minutes — current affairs sets are short
+const FETCH_POOL_LIMIT = 500;
 
-// 🎯 All the exam-key variants a bulk upload might have used for this section.
-// This is the same normalization pattern used across Daily Challenge / Warrior Questions,
-// so it doesn't matter if questions were tagged "CURRENT_AFFAIRS", "Current Affairs",
-// "current_affairs", etc — they'll all be found.
-const EXAM_KEY_VARIANTS = [
-    "CURRENT_AFFAIRS",
-    "Current_Affairs",
-    "current_affairs",
-    "CURRENT AFFAIRS",
-    "Current Affairs",
-    "current affairs",
-];
+// 🎯 All Current Affairs questions share this exam-tag prefix, e.g.
+// "Current_Affairs_2026", and future years like "Current_Affairs_2027" will
+// automatically work too since we match by prefix, not an exact year.
+const EXAM_PREFIX = "Current_Affairs";
 
-function formatTime(seconds: number) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+function formatTime(sec: number) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function getSecureRandom(): number {
@@ -83,96 +78,110 @@ function fisherYatesShuffle<T>(arr: T[]): T[] {
     return result;
 }
 
-function shuffleOptions(optEn: string[], optHi: string[], correctIndex: number) {
+function shuffleQuestionOptions(optEn: string[], optHi: string[], correctIndex: number) {
     let indices = fisherYatesShuffle([0, 1, 2, 3]);
     indices = fisherYatesShuffle(indices);
+
     const newOptEn = indices.map((idx) => optEn[idx]);
     const newOptHi = indices.map((idx) => optHi[idx]);
     const newCorrectIndex = indices.indexOf(correctIndex);
-    return { newOptEn, newOptHi, newCorrectText: newOptEn[newCorrectIndex] };
+    const newCorrectText = newOptEn[newCorrectIndex];
+
+    return { newOptEn, newOptHi, newCorrectText };
 }
 
-export default function CurrentAffairsTest() {
+export default function CurrentAffairsPage() {
     const router = useRouter();
-    const [user, authLoading] = useAuthState(auth);
-
     const [phase, setPhase] = useState<Phase>("loading");
-    const [error, setError] = useState("");
-
-    const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
-    const [selectedSubject, setSelectedSubject] = useState("");
-
     const [questions, setQuestions] = useState<Question[]>([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: string }>({});
+    const [answers, setAnswers] = useState<string[]>([]);
+    const [current, setCurrent] = useState(0);
     const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
     const [score, setScore] = useState(0);
+    const [error, setError] = useState("");
+    const [poolSize, setPoolSize] = useState(0);
+    const [user, authLoading, authError] = useAuthState(auth);
 
-    // LOAD AVAILABLE CATEGORIES — checks ALL exam-key variants at once
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const q = useMemo(() => {
+        return (
+            questions[current] || {
+                id: "",
+                questionEn: "",
+                questionHi: "",
+                optionsEn: [],
+                optionsHi: [],
+                answer: "",
+                subject: "",
+            }
+        );
+    }, [questions, current]);
+
     useEffect(() => {
         if (authLoading) return;
+
+        if (authError) {
+            setError("Authentication failed. Please try logging in again.");
+            setPhase("result");
+            return;
+        }
+
         if (!user) {
             setError("Please log in to access Current Affairs.");
             setPhase("result");
             return;
         }
 
-        async function loadSubjects() {
-            try {
-                setError("");
+        checkAvailability();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, authLoading, authError]);
 
-                const snap = await getDocs(
-                    query(
-                        collection(db, "questions"),
-                        where("exam", "in", EXAM_KEY_VARIANTS),
-                        limit(1000)
-                    )
-                );
-
-                const subjectSet = new Set<string>();
-                snap.forEach((d) => {
-                    const data: any = d.data();
-                    const subj = data.subject || data.topic;
-                    if (subj) subjectSet.add(subj);
-                });
-
-                const subjectList = Array.from(subjectSet).sort().reverse();
-
-                if (subjectList.length === 0) {
-                    setError("No Current Affairs questions available yet. Check back soon!");
-                    setPhase("result");
-                    return;
-                }
-
-                setAvailableSubjects(subjectList);
-                setPhase("subject-select");
-            } catch (err) {
-                console.error(err);
-                setError("Failed to load Current Affairs categories.");
-                setPhase("result");
-            }
-        }
-
-        loadSubjects();
-    }, [user, authLoading]);
-
-    const startQuizForSubject = async (subject: string) => {
+    // STEP 1 — CHECK HOW MANY CURRENT AFFAIRS QUESTIONS EXIST (prefix match on "exam")
+    const checkAvailability = async () => {
         try {
-            setSelectedSubject(subject);
-            setPhase("loading");
             setError("");
-            setQuestions([]);
-            setSelectedAnswers({});
-            setCurrentIndex(0);
-            setTimeLeft(TIMER_SECONDS);
-            setScore(0);
 
             const snap = await getDocs(
                 query(
                     collection(db, "questions"),
-                    where("exam", "in", EXAM_KEY_VARIANTS),
-                    where("subject", "==", subject),
-                    limit(200)
+                    where("exam", ">=", EXAM_PREFIX),
+                    where("exam", "<", EXAM_PREFIX + "\uf8ff"),
+                    limit(FETCH_POOL_LIMIT)
+                )
+            );
+
+            if (snap.empty) {
+                setError("No Current Affairs questions available yet. Check back soon.");
+                setPhase("result");
+                return;
+            }
+
+            setPoolSize(snap.size);
+            setPhase("intro");
+        } catch (err) {
+            console.error(err);
+            setError("Failed to check Current Affairs availability.");
+            setPhase("result");
+        }
+    };
+
+    // STEP 2 — LOAD A RANDOM SET OF CURRENT AFFAIRS QUESTIONS
+    const startSet = async () => {
+        try {
+            setPhase("loading");
+            setError("");
+            setQuestions([]);
+            setAnswers([]);
+            setCurrent(0);
+            setTimeLeft(TIMER_SECONDS);
+
+            const snap = await getDocs(
+                query(
+                    collection(db, "questions"),
+                    where("exam", ">=", EXAM_PREFIX),
+                    where("exam", "<", EXAM_PREFIX + "\uf8ff"),
+                    limit(FETCH_POOL_LIMIT)
                 )
             );
 
@@ -190,8 +199,9 @@ export default function CurrentAffairsTest() {
                 };
                 const answerValue = optionMap[answerKey];
 
-                const primaryText = data.questionEn || data.question || "";
-                const allOptionsPresent = data.optionA && data.optionB && data.optionC && data.optionD;
+                const primaryText = data.questionEn || "";
+                const allOptionsPresent =
+                    data.optionA && data.optionB && data.optionC && data.optionD;
 
                 if (!primaryText || !allOptionsPresent || !answerValue) return;
 
@@ -204,7 +214,11 @@ export default function CurrentAffairsTest() {
                 ];
 
                 const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
-                const { newOptEn, newOptHi, newCorrectText } = shuffleOptions(rawOptEn, rawOptHi, correctIndex);
+                const { newOptEn, newOptHi, newCorrectText } = shuffleQuestionOptions(
+                    rawOptEn,
+                    rawOptHi,
+                    correctIndex
+                );
 
                 arr.push({
                     id: d.id,
@@ -215,23 +229,24 @@ export default function CurrentAffairsTest() {
                     answer: newCorrectText,
                     explanationEn: data.explanationEn || "",
                     explanationHi: data.explanationHi || "",
-                    subject: data.subject || subject,
+                    subject: data.subject || "Current Affairs",
                 });
             });
 
             arr = fisherYatesShuffle(arr).slice(0, TOTAL_QUESTIONS);
 
             if (arr.length === 0) {
-                setError(`No verified questions found for ${subject}.`);
+                setError("No verified Current Affairs questions found.");
                 setPhase("result");
                 return;
             }
 
             setQuestions(arr);
+            setAnswers(new Array(arr.length).fill(""));
             setPhase("quiz");
         } catch (err) {
             console.error(err);
-            setError("Failed to load questions.");
+            setError("Failed to load Current Affairs set.");
             setPhase("result");
         }
     };
@@ -239,82 +254,99 @@ export default function CurrentAffairsTest() {
     useEffect(() => {
         if (phase !== "quiz") return;
 
-        const timer = setInterval(() => {
+        timerRef.current = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
-                    clearInterval(timer);
-                    handleSubmitTest();
+                    clearInterval(timerRef.current!);
+                    finishTest();
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
 
-        return () => clearInterval(timer);
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase]);
 
-    const handleOptionSelect = (option: string) => {
-        if (selectedAnswers[currentIndex] !== undefined) return;
-        setSelectedAnswers({ ...selectedAnswers, [currentIndex]: option });
+    const selectAnswer = (option: string) => {
+        const updated = [...answers];
+        updated[current] = option;
+        setAnswers(updated);
     };
 
-    const handleSubmitTest = async () => {
+    const nextQuestion = () => {
+        if (current < questions.length - 1) {
+            setCurrent(current + 1);
+        } else {
+            finishTest();
+        }
+    };
+
+    const finishTest = async () => {
+        if (timerRef.current) clearInterval(timerRef.current);
         setPhase("submitting");
 
         let finalScore = 0;
-        questions.forEach((q, idx) => {
-            if (selectedAnswers[idx] === q.answer) finalScore += 1;
+        questions.forEach((q, i) => {
+            if (answers[i] === q.answer) finalScore++;
         });
+
         setScore(finalScore);
 
-        const uid = user?.uid || "guest";
+        const activeUserId = user?.uid || auth.currentUser?.uid || "guest";
 
         try {
             await addDoc(collection(db, "exam_results"), {
-                userId: uid,
+                userId: activeUserId,
                 userName: user?.displayName || user?.email || "Student",
                 score: finalScore,
                 total: questions.length,
-                examTrack: "CURRENT_AFFAIRS",
-                subject: selectedSubject,
-                mode: "current_affairs",
+                examTrack: "Current Affairs",
+                subject: "Current Affairs",
+                mode: "current-affairs",
                 createdAt: serverTimestamp(),
             });
 
-            const wrongOnes = questions.filter((q, idx) => (selectedAnswers[idx] || "").trim() !== q.answer);
+            const weakQuestionsToLog = questions.flatMap((q, i) => {
+                const selectedAnswer = (answers[i] || "").trim();
+                if (selectedAnswer === q.answer) return [];
 
-            for (const q of wrongOnes) {
-                await addDoc(collection(db, "weak_questions"), {
-                    userId: uid,
+                return [{
+                    userId: activeUserId,
                     questionEn: q.questionEn,
                     questionHi: q.questionHi,
                     optionsEn: q.optionsEn,
                     optionsHi: q.optionsHi,
                     correctAnswer: q.answer,
-                    topic: q.subject || selectedSubject,
+                    topic: "Current Affairs",
                     timestamp: serverTimestamp(),
+                }];
+            });
+
+            if (weakQuestionsToLog.length > 0) {
+                const batch = writeBatch(db);
+                weakQuestionsToLog.forEach((entry) => {
+                    const ref = doc(collection(db, "weak_questions"));
+                    batch.set(ref, entry);
                 });
+                await batch.commit();
             }
         } catch (err) {
-            console.log("Submission error:", err);
+            console.log("Database submission error:", err);
         }
 
         setPhase("result");
     };
 
-    const handleRetry = () => {
-        setPhase("subject-select");
-        setSelectedAnswers({});
-        setCurrentIndex(0);
-        setScore(0);
-        setSelectedSubject("");
-    };
+    // ===================== UI =====================
 
     if (phase === "loading") {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
                 <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
                     Loading Current Affairs...
                 </p>
@@ -322,7 +354,7 @@ export default function CurrentAffairsTest() {
         );
     }
 
-    if (phase === "subject-select") {
+    if (phase === "intro") {
         return (
             <div className="min-h-screen bg-slate-50/50 pb-32">
                 <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
@@ -334,35 +366,35 @@ export default function CurrentAffairsTest() {
                             <ArrowLeft size={16} />
                         </button>
                         <div>
-                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">
                                 📰 Current Affairs
                             </span>
                             <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
-                                Stay Updated
+                                Free for Everyone
                             </h1>
                         </div>
                     </div>
                 </header>
 
                 <div className="max-w-2xl mx-auto px-4 mt-8">
-                    <h2 className="text-xl font-black text-slate-900 mb-1">Choose a Category</h2>
-                    <p className="text-slate-500 text-sm mb-6">
-                        {TOTAL_QUESTIONS} verified questions, {TIMER_SECONDS / 60} minutes. Hindi & English both available.
-                    </p>
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm text-center">
+                        <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <Newspaper size={26} />
+                        </div>
+                        <h2 className="text-xl font-black text-slate-900 mb-2">Daily Current Affairs</h2>
+                        <p className="text-slate-500 text-sm leading-relaxed mb-1">
+                            {TOTAL_QUESTIONS} quick questions covering recent news — national, international, sports, and economy.
+                        </p>
+                        <p className="text-slate-400 text-xs mb-6">
+                            {poolSize}+ questions in the bank • fresh random mix every attempt
+                        </p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {availableSubjects.map((subject) => (
-                            <button
-                                key={subject}
-                                onClick={() => startQuizForSubject(subject)}
-                                className="bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 text-left shadow-sm hover:shadow-md transition-all flex items-center gap-3 group"
-                            >
-                                <div className="bg-blue-50 text-blue-600 p-2.5 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                    <Newspaper size={18} />
-                                </div>
-                                <span className="font-bold text-sm text-slate-800">{subject}</span>
-                            </button>
-                        ))}
+                        <button
+                            onClick={startSet}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                        >
+                            <Newspaper size={16} /> Start Current Affairs
+                        </button>
                     </div>
                 </div>
             </div>
@@ -374,7 +406,7 @@ export default function CurrentAffairsTest() {
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
                 <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
                 <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    Saving your results...
+                    Saving results...
                 </p>
             </div>
         );
@@ -383,187 +415,208 @@ export default function CurrentAffairsTest() {
     if (phase === "result") {
         if (error) {
             return (
-                <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-xl border border-slate-200">
-                        <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            ⚠️
+                <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+                    <div className="max-w-md w-full bg-white border border-slate-200 p-6 rounded-2xl shadow-sm text-center">
+                        <p className="text-red-500 font-bold text-sm tracking-tight">{error}</p>
+                        <div className="flex gap-2 mt-4 justify-center">
+                            <button
+                                onClick={() => router.push("/")}
+                                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+                            >
+                                Go Back
+                            </button>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+                            >
+                                Retry
+                            </button>
                         </div>
-                        <p className="text-rose-600 font-bold text-sm">{error}</p>
-                        <button
-                            onClick={() => router.push("/")}
-                            className="mt-5 w-full bg-slate-900 text-white h-12 rounded-xl font-bold text-sm"
-                        >
-                            Back to Dashboard
-                        </button>
                     </div>
-                </main>
+                </div>
             );
         }
 
-        const total = questions.length;
-        const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
-
         return (
-            <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-xl border border-slate-200">
-                    <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-                        <Award size={40} />
+            <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4 antialiased">
+                <div className="bg-white border border-slate-200/80 rounded-3xl p-8 w-full max-w-lg shadow-xl shadow-slate-200/40 text-center">
+                    <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-5 shadow-sm">
+                        📰
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Test Completed! 🎉</h1>
-                    <p className="text-slate-500 text-sm mb-1">{selectedSubject}</p>
-                    <p className="text-slate-400 text-xs mb-6">Here is your performance breakdown.</p>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+                        Set Complete
+                    </h1>
+                    <p className="text-slate-400 mt-1 text-xs font-medium">
+                        Current Affairs performance recorded.
+                    </p>
 
-                    <div className="grid grid-cols-3 gap-3 mb-8">
-                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                            <span className="text-xs text-slate-400 font-bold uppercase block">Total Qs</span>
-                            <span className="text-xl font-black text-slate-900">{total}</span>
+                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mt-6 flex items-center justify-between">
+                        <div className="text-left">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Score</span>
+                            <span className="text-sm font-semibold text-slate-500 mt-1 block">Correct Answers</span>
                         </div>
-                        <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                            <span className="text-xs text-emerald-600 font-bold uppercase block">Score</span>
-                            <span className="text-xl font-black text-emerald-700">{score}</span>
-                        </div>
-                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                            <span className="text-xs text-blue-600 font-bold uppercase block">Accuracy</span>
-                            <span className="text-xl font-black text-blue-700">{percentage}%</span>
+                        <div className="text-right">
+                            <h2 className="text-4xl font-black text-emerald-600 tracking-tight">
+                                {score} <span className="text-slate-400 text-xs font-bold">/ {questions.length}</span>
+                            </h2>
                         </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 mt-6">
                         <button
-                            onClick={() => router.push("/")}
-                            className="flex-1 bg-slate-900 text-white h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition"
+                            onClick={() => setPhase("intro")}
+                            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 h-12 rounded-xl font-bold text-xs shadow-sm transition-all uppercase tracking-wider"
                         >
-                            <Home size={16} /> Dashboard
+                            New Set
                         </button>
                         <button
-                            onClick={handleRetry}
-                            className="flex-1 bg-blue-600 text-white h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-500 transition"
+                            onClick={() => (window.location.href = "/leaderboard")}
+                            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-xs shadow-md transition-all uppercase tracking-wider"
                         >
-                            <RotateCcw size={16} /> Try Another
+                            Leaderboard
                         </button>
                     </div>
                 </div>
-            </main>
+            </div>
         );
     }
 
-    const currentQ = questions[currentIndex];
-    const userSelectedOpt = selectedAnswers[currentIndex];
-    const hasAnswered = userSelectedOpt !== undefined;
-
+    // QUIZ SCREEN
     return (
-        <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-20 font-sans">
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200">
-                <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+        <div className="min-h-screen bg-slate-50/50 pb-32 antialiased text-slate-900 selection:bg-emerald-600 selection:text-white">
+
+            <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
+                <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={() => setPhase("subject-select")}
+                            onClick={() => setPhase("intro")}
                             className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition flex-shrink-0"
                         >
                             <ArrowLeft size={16} />
                         </button>
+
                         <div>
-                            <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">{selectedSubject}</h1>
-                            <p className="text-xs text-slate-500 font-medium">Question {currentIndex + 1} of {questions.length}</p>
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">
+                                {q.subject || "Current Affairs"}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
+                                    Current Affairs
+                                </h1>
+                            </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl font-mono font-bold text-sm shadow-md">
-                        <Timer size={16} className="text-amber-400 animate-pulse" />
+
+                    <div className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-xl font-black text-lg tracking-tight flex items-center gap-2 shadow-sm">
+                        <Timer size={16} className="animate-pulse" />
                         <span>{formatTime(timeLeft)}</span>
                     </div>
                 </div>
-                <div className="h-1 w-full bg-slate-100">
+
+                <div className="h-1 w-full bg-slate-100 relative">
                     <div
-                        className="h-full bg-blue-600 transition-all duration-300"
-                        style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+                        className="h-full bg-emerald-600 transition-all duration-300 rounded-r"
+                        style={{ width: `${((current + 1) / questions.length) * 100}%` }}
                     />
                 </div>
             </header>
 
-            <main className="max-w-3xl mx-auto px-4 pt-8">
-                <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+            <main className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
 
-                    <div className="mb-6 space-y-3">
-                        <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed">
-                            {currentIndex + 1}. {currentQ.questionEn}
+                <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
+                        <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                Question {current + 1} of {questions.length}
+                            </span>
+                            <span className="inline-block mt-1 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-md text-[10px] font-black px-2 py-0.5 uppercase tracking-wide">
+                                {q.subject}
+                            </span>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                            <CheckCircle size={12} className="text-emerald-500" />
+                            <span>{answers.filter(Boolean).length} Answered</span>
+                        </div>
+                    </div>
+
+                    <div className="mb-6">
+                        <h2 className="text-xl font-black leading-relaxed text-slate-900 tracking-tight mb-4">
+                            {q.questionEn}
                         </h2>
-                        {currentQ.questionHi && (
-                            <h2 className="text-base sm:text-lg font-semibold text-slate-600 leading-relaxed border-t border-dashed border-slate-100 pt-3 font-hindi">
-                                {currentQ.questionHi}
-                            </h2>
+                        {q.questionHi && (
+                            <>
+                                <div className="border-t border-slate-200 my-4"></div>
+                                <h2 className="text-xl font-bold leading-relaxed text-slate-700 tracking-tight font-hindi">
+                                    {q.questionHi}
+                                </h2>
+                            </>
                         )}
                     </div>
 
-                    <div className="space-y-3 mb-8">
-                        {currentQ.optionsEn.map((optEn, idx) => {
-                            const optHi = currentQ.optionsHi?.[idx] || "";
-                            const isCorrect = optEn === currentQ.answer;
-                            const isSelected = userSelectedOpt === optEn;
-
-                            let optionStyle = "border-slate-200 hover:border-blue-500 bg-white text-slate-700";
-
-                            if (hasAnswered) {
-                                if (isCorrect) {
-                                    optionStyle = "border-emerald-500 bg-emerald-50 text-emerald-900 font-bold";
-                                } else if (isSelected) {
-                                    optionStyle = "border-rose-500 bg-rose-50 text-rose-900 font-bold";
-                                } else {
-                                    optionStyle = "border-slate-200 opacity-60 bg-slate-50";
-                                }
-                            }
-
+                    <div className="space-y-3">
+                        {q.optionsEn.map((optEn: string, i: number) => {
+                            const optHi = q.optionsHi?.[i] || "";
+                            const isSelected = answers[current] === optEn;
                             return (
                                 <button
-                                    key={idx}
-                                    disabled={hasAnswered}
-                                    onClick={() => handleOptionSelect(optEn)}
-                                    className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 text-sm sm:text-base ${optionStyle}`}
+                                    key={i}
+                                    onClick={() => selectAnswer(optEn)}
+                                    className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${isSelected
+                                        ? "border-emerald-600 bg-emerald-50/60 shadow-sm shadow-emerald-600/5 text-emerald-900"
+                                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
+                                        }`}
                                 >
-                                    <div className="flex-1 min-w-0">
-                                        <span className="block">{optEn}</span>
-                                        {optHi && <span className="block text-xs sm:text-sm font-medium opacity-80 mt-0.5 font-hindi">{optHi}</span>}
+                                    <div
+                                        className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isSelected
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                                            }`}
+                                    >
+                                        {String.fromCharCode(65 + i)}
                                     </div>
-                                    {hasAnswered && isCorrect && <CheckCircle2 size={20} className="text-emerald-600 flex-shrink-0" />}
-                                    {hasAnswered && isSelected && !isCorrect && <XCircle size={20} className="text-rose-600 flex-shrink-0" />}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-semibold leading-relaxed break-words">
+                                            {optEn}
+                                        </div>
+                                        {optHi && (
+                                            <div className="text-xs font-medium text-slate-600 mt-1 font-hindi break-words">
+                                                {optHi}
+                                            </div>
+                                        )}
+                                    </div>
                                 </button>
                             );
                         })}
                     </div>
 
-                    {hasAnswered && (currentQ.explanationEn || currentQ.explanationHi) && (
-                        <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-5 mb-8 animate-in fade-in duration-300">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-2 flex items-center gap-1.5">
-                                <BookOpen size={12} /> Explanation
-                            </h4>
-                            {currentQ.explanationEn && <p className="text-slate-700 text-sm leading-relaxed mb-1.5">{currentQ.explanationEn}</p>}
-                            {currentQ.explanationHi && <p className="text-slate-600 text-sm leading-relaxed font-hindi border-t border-blue-100 pt-1.5">{currentQ.explanationHi}</p>}
-                        </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                        <button
-                            onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-                            disabled={currentIndex === 0}
-                            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm disabled:opacity-40 hover:bg-slate-50 transition"
-                        >
-                            Previous
-                        </button>
-
-                        {currentIndex < questions.length - 1 ? (
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-3">
+                        {current > 0 && (
                             <button
-                                onClick={() => setCurrentIndex((prev) => prev + 1)}
-                                className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-slate-800 transition shadow-md"
+                                onClick={() => setCurrent(current - 1)}
+                                className="inline-flex items-center gap-1 px-4 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all border border-slate-200/40"
                             >
-                                Next <ArrowRight size={16} />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleSubmitTest}
-                                className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-emerald-500 transition shadow-md"
-                            >
-                                Submit Test <CheckCircle2 size={16} />
+                                <ArrowLeft size={14} /> Back
                             </button>
                         )}
+                        <button
+                            onClick={nextQuestion}
+                            disabled={!answers[current]}
+                            className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${answers[current]
+                                ? "bg-slate-900 hover:bg-slate-800 text-white"
+                                : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                                }`}
+                        >
+                            {current === questions.length - 1 ? (
+                                <>
+                                    <Flag size={13} /> Submit
+                                </>
+                            ) : (
+                                <>
+                                    Next <ArrowRight size={13} />
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
             </main>
