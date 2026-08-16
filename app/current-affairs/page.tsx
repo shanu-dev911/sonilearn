@@ -44,7 +44,20 @@ type Question = {
 type Phase = "loading" | "subject-select" | "quiz" | "submitting" | "result";
 
 const TOTAL_QUESTIONS = 25;
-const TIMER_SECONDS = 20 * 60; // 20 minutes
+const TIMER_SECONDS = 20 * 60;
+
+// 🎯 All the exam-key variants a bulk upload might have used for this section.
+// This is the same normalization pattern used across Daily Challenge / Warrior Questions,
+// so it doesn't matter if questions were tagged "CURRENT_AFFAIRS", "Current Affairs",
+// "current_affairs", etc — they'll all be found.
+const EXAM_KEY_VARIANTS = [
+    "CURRENT_AFFAIRS",
+    "Current_Affairs",
+    "current_affairs",
+    "CURRENT AFFAIRS",
+    "Current Affairs",
+    "current affairs",
+];
 
 function formatTime(seconds: number) {
     const mins = Math.floor(seconds / 60);
@@ -52,8 +65,6 @@ function formatTime(seconds: number) {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
-// 🎯 STRONG RUNTIME RESHUFFLE — same pattern used across the platform,
-// guarantees option order is genuinely randomized every load.
 function getSecureRandom(): number {
     if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
         const arr = new Uint32Array(1);
@@ -63,7 +74,7 @@ function getSecureRandom(): number {
     return Math.random();
 }
 
-function fisherYatesShuffle(arr: number[]): number[] {
+function fisherYatesShuffle<T>(arr: T[]): T[] {
     const result = [...arr];
     for (let i = result.length - 1; i > 0; i--) {
         const j = Math.floor(getSecureRandom() * (i + 1));
@@ -81,8 +92,6 @@ function shuffleOptions(optEn: string[], optHi: string[], correctIndex: number) 
     return { newOptEn, newOptHi, newCorrectText: newOptEn[newCorrectIndex] };
 }
 
-const EXAM_KEY = "CURRENT_AFFAIRS";
-
 export default function CurrentAffairsTest() {
     const router = useRouter();
     const [user, authLoading] = useAuthState(auth);
@@ -99,7 +108,7 @@ export default function CurrentAffairsTest() {
     const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
     const [score, setScore] = useState(0);
 
-    // LOAD AVAILABLE MONTH/SUBJECT CATEGORIES
+    // LOAD AVAILABLE CATEGORIES — checks ALL exam-key variants at once
     useEffect(() => {
         if (authLoading) return;
         if (!user) {
@@ -113,7 +122,11 @@ export default function CurrentAffairsTest() {
                 setError("");
 
                 const snap = await getDocs(
-                    query(collection(db, "questions"), where("exam", "==", EXAM_KEY), limit(500))
+                    query(
+                        collection(db, "questions"),
+                        where("exam", "in", EXAM_KEY_VARIANTS),
+                        limit(1000)
+                    )
                 );
 
                 const subjectSet = new Set<string>();
@@ -123,7 +136,7 @@ export default function CurrentAffairsTest() {
                     if (subj) subjectSet.add(subj);
                 });
 
-                const subjectList = Array.from(subjectSet).sort().reverse(); // latest month first if named like "August 2026"
+                const subjectList = Array.from(subjectSet).sort().reverse();
 
                 if (subjectList.length === 0) {
                     setError("No Current Affairs questions available yet. Check back soon!");
@@ -143,7 +156,6 @@ export default function CurrentAffairsTest() {
         loadSubjects();
     }, [user, authLoading]);
 
-    // LOAD QUESTIONS FOR SELECTED CATEGORY (verified + reshuffled)
     const startQuizForSubject = async (subject: string) => {
         try {
             setSelectedSubject(subject);
@@ -158,9 +170,9 @@ export default function CurrentAffairsTest() {
             const snap = await getDocs(
                 query(
                     collection(db, "questions"),
-                    where("exam", "==", EXAM_KEY),
+                    where("exam", "in", EXAM_KEY_VARIANTS),
                     where("subject", "==", subject),
-                    limit(150)
+                    limit(200)
                 )
             );
 
@@ -181,7 +193,6 @@ export default function CurrentAffairsTest() {
                 const primaryText = data.questionEn || data.question || "";
                 const allOptionsPresent = data.optionA && data.optionB && data.optionC && data.optionD;
 
-                // VERIFICATION — skip invalid/incomplete questions entirely
                 if (!primaryText || !allOptionsPresent || !answerValue) return;
 
                 const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD];
@@ -208,7 +219,7 @@ export default function CurrentAffairsTest() {
                 });
             });
 
-            arr = arr.sort(() => Math.random() - 0.5).slice(0, TOTAL_QUESTIONS);
+            arr = fisherYatesShuffle(arr).slice(0, TOTAL_QUESTIONS);
 
             if (arr.length === 0) {
                 setError(`No verified questions found for ${subject}.`);
@@ -225,7 +236,6 @@ export default function CurrentAffairsTest() {
         }
     };
 
-    // TIMER
     useEffect(() => {
         if (phase !== "quiz") return;
 
@@ -266,7 +276,7 @@ export default function CurrentAffairsTest() {
                 userName: user?.displayName || user?.email || "Student",
                 score: finalScore,
                 total: questions.length,
-                examTrack: EXAM_KEY,
+                examTrack: "CURRENT_AFFAIRS",
                 subject: selectedSubject,
                 mode: "current_affairs",
                 createdAt: serverTimestamp(),
@@ -301,8 +311,6 @@ export default function CurrentAffairsTest() {
         setSelectedSubject("");
     };
 
-    // ===================== UI =====================
-
     if (phase === "loading") {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
@@ -314,7 +322,6 @@ export default function CurrentAffairsTest() {
         );
     }
 
-    // SUBJECT / MONTH SELECTION SCREEN
     if (phase === "subject-select") {
         return (
             <div className="min-h-screen bg-slate-50/50 pb-32">
@@ -440,7 +447,6 @@ export default function CurrentAffairsTest() {
         );
     }
 
-    // QUIZ SCREEN
     const currentQ = questions[currentIndex];
     const userSelectedOpt = selectedAnswers[currentIndex];
     const hasAnswered = userSelectedOpt !== undefined;
@@ -477,7 +483,6 @@ export default function CurrentAffairsTest() {
             <main className="max-w-3xl mx-auto px-4 pt-8">
                 <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
 
-                    {/* BILINGUAL QUESTION */}
                     <div className="mb-6 space-y-3">
                         <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed">
                             {currentIndex + 1}. {currentQ.questionEn}
@@ -489,7 +494,6 @@ export default function CurrentAffairsTest() {
                         )}
                     </div>
 
-                    {/* BILINGUAL OPTIONS */}
                     <div className="space-y-3 mb-8">
                         {currentQ.optionsEn.map((optEn, idx) => {
                             const optHi = currentQ.optionsHi?.[idx] || "";
@@ -526,7 +530,6 @@ export default function CurrentAffairsTest() {
                         })}
                     </div>
 
-                    {/* EXPLANATION */}
                     {hasAnswered && (currentQ.explanationEn || currentQ.explanationHi) && (
                         <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-5 mb-8 animate-in fade-in duration-300">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-2 flex items-center gap-1.5">
@@ -537,7 +540,6 @@ export default function CurrentAffairsTest() {
                         </div>
                     )}
 
-                    {/* NAVIGATION */}
                     <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                         <button
                             onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
