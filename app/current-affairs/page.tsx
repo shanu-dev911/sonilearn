@@ -29,7 +29,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
-import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, Newspaper } from "lucide-react";
+import { Timer, CheckCircle, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Flag, Newspaper, BookOpen, Calendar } from "lucide-react";
 
 interface Question {
     id: string;
@@ -41,12 +41,14 @@ interface Question {
     explanationEn?: string;
     explanationHi?: string;
     subject?: string;
+    examTag?: string;
+    yearLabel?: string;
 }
 
 type Phase = "loading" | "intro" | "quiz" | "submitting" | "result";
 
-const TOTAL_QUESTIONS = 10;
-const TIMER_SECONDS = 10 * 60; // 10 minutes — current affairs sets are short
+const TOTAL_QUESTIONS = 30;
+const TIMER_SECONDS = 30 * 60; // 30 minutes
 const FETCH_POOL_LIMIT = 500;
 
 // 🎯 All Current Affairs questions share this exam-tag prefix, e.g.
@@ -90,6 +92,12 @@ function shuffleQuestionOptions(optEn: string[], optHi: string[], correctIndex: 
     return { newOptEn, newOptHi, newCorrectText };
 }
 
+// 🎯 Pulls a 4-digit year out of the exam tag, e.g. "Current_Affairs_2026" -> "2026"
+function extractYear(examField: string): string {
+    const match = (examField || "").match(/(\d{4})/);
+    return match ? match[1] : "";
+}
+
 export default function CurrentAffairsPage() {
     const router = useRouter();
     const [phase, setPhase] = useState<Phase>("loading");
@@ -114,9 +122,13 @@ export default function CurrentAffairsPage() {
                 optionsHi: [],
                 answer: "",
                 subject: "",
+                examTag: "",
+                yearLabel: "",
             }
         );
     }, [questions, current]);
+
+    const hasAnswered = !!answers[current];
 
     useEffect(() => {
         if (authLoading) return;
@@ -230,6 +242,8 @@ export default function CurrentAffairsPage() {
                     explanationEn: data.explanationEn || "",
                     explanationHi: data.explanationHi || "",
                     subject: data.subject || "Current Affairs",
+                    examTag: data.examTag || "",
+                    yearLabel: extractYear(data.exam || ""),
                 });
             });
 
@@ -271,7 +285,10 @@ export default function CurrentAffairsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase]);
 
+    // 🎯 Selecting an option locks it in immediately and reveals correctness +
+    // explanation right away, instead of waiting until the whole set ends.
     const selectAnswer = (option: string) => {
+        if (hasAnswered) return; // already answered this one — don't allow changes
         const updated = [...answers];
         updated[current] = option;
         setAnswers(updated);
@@ -383,7 +400,7 @@ export default function CurrentAffairsPage() {
                         </div>
                         <h2 className="text-xl font-black text-slate-900 mb-2">Daily Current Affairs</h2>
                         <p className="text-slate-500 text-sm leading-relaxed mb-1">
-                            {TOTAL_QUESTIONS} quick questions covering recent news — national, international, sports, and economy.
+                            {TOTAL_QUESTIONS} questions, {TIMER_SECONDS / 60} minutes — with explanations and exam relevance shown after every answer.
                         </p>
                         <p className="text-slate-400 text-xs mb-6">
                             {poolSize}+ questions in the bank • fresh random mix every attempt
@@ -558,19 +575,38 @@ export default function CurrentAffairsPage() {
                         {q.optionsEn.map((optEn: string, i: number) => {
                             const optHi = q.optionsHi?.[i] || "";
                             const isSelected = answers[current] === optEn;
+                            const isCorrect = optEn === q.answer;
+
+                            // 🎯 Immediate reveal styling once this question has been answered
+                            let optionStyle =
+                                "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800";
+                            if (hasAnswered) {
+                                if (isCorrect) {
+                                    optionStyle = "border-emerald-500 bg-emerald-50 text-emerald-900";
+                                } else if (isSelected) {
+                                    optionStyle = "border-rose-500 bg-rose-50 text-rose-900";
+                                } else {
+                                    optionStyle = "border-slate-200 bg-slate-50 text-slate-400 opacity-70";
+                                }
+                            } else if (isSelected) {
+                                optionStyle = "border-emerald-600 bg-emerald-50/60 shadow-sm text-emerald-900";
+                            }
+
                             return (
                                 <button
                                     key={i}
                                     onClick={() => selectAnswer(optEn)}
-                                    className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${isSelected
-                                        ? "border-emerald-600 bg-emerald-50/60 shadow-sm shadow-emerald-600/5 text-emerald-900"
-                                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
-                                        }`}
+                                    disabled={hasAnswered}
+                                    className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${optionStyle}`}
                                 >
                                     <div
-                                        className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isSelected
-                                            ? "bg-emerald-600 text-white"
-                                            : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                                        className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${hasAnswered && isCorrect
+                                                ? "bg-emerald-600 text-white"
+                                                : hasAnswered && isSelected
+                                                    ? "bg-rose-600 text-white"
+                                                    : isSelected
+                                                        ? "bg-emerald-600 text-white"
+                                                        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
                                             }`}
                                     >
                                         {String.fromCharCode(65 + i)}
@@ -585,10 +621,52 @@ export default function CurrentAffairsPage() {
                                             </div>
                                         )}
                                     </div>
+                                    {hasAnswered && isCorrect && (
+                                        <CheckCircle2 size={20} className="text-emerald-600 flex-shrink-0" />
+                                    )}
+                                    {hasAnswered && isSelected && !isCorrect && (
+                                        <XCircle size={20} className="text-rose-600 flex-shrink-0" />
+                                    )}
                                 </button>
                             );
                         })}
                     </div>
+
+                    {/* 🎯 EXPLANATION + EXAM RELEVANCE + YEAR — shown right after answering */}
+                    {hasAnswered && (q.explanationEn || q.explanationHi || q.examTag || q.yearLabel) && (
+                        <div className="mt-6 bg-blue-50/80 border border-blue-200 rounded-2xl p-5 animate-in fade-in duration-300">
+                            {(q.explanationEn || q.explanationHi) && (
+                                <>
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-2 flex items-center gap-1.5">
+                                        <BookOpen size={12} /> Explanation
+                                    </h4>
+                                    {q.explanationEn && (
+                                        <p className="text-slate-700 text-sm leading-relaxed mb-1.5">{q.explanationEn}</p>
+                                    )}
+                                    {q.explanationHi && (
+                                        <p className="text-slate-600 text-sm leading-relaxed font-hindi border-t border-blue-100 pt-1.5">
+                                            {q.explanationHi}
+                                        </p>
+                                    )}
+                                </>
+                            )}
+
+                            {(q.examTag || q.yearLabel) && (
+                                <div className="mt-3 pt-3 border-t border-blue-100 flex flex-wrap items-center gap-2">
+                                    {q.examTag && (
+                                        <span className="inline-flex items-center gap-1.5 bg-white border border-blue-200 text-blue-700 text-[11px] font-bold px-3 py-1.5 rounded-lg">
+                                            <Flag size={12} /> Asked in: {q.examTag}
+                                        </span>
+                                    )}
+                                    {q.yearLabel && (
+                                        <span className="inline-flex items-center gap-1.5 bg-white border border-blue-200 text-blue-700 text-[11px] font-bold px-3 py-1.5 rounded-lg">
+                                            <Calendar size={12} /> {q.yearLabel}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-3">
                         {current > 0 && (
@@ -601,10 +679,10 @@ export default function CurrentAffairsPage() {
                         )}
                         <button
                             onClick={nextQuestion}
-                            disabled={!answers[current]}
-                            className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${answers[current]
-                                ? "bg-slate-900 hover:bg-slate-800 text-white"
-                                : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                            disabled={!hasAnswered}
+                            className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${hasAnswered
+                                    ? "bg-slate-900 hover:bg-slate-800 text-white"
+                                    : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                                 }`}
                         >
                             {current === questions.length - 1 ? (
