@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
         name: 'SoniLearn - Daily Practice & Battleground',
         short_name: 'SoniLearn',
         description: 'Daily Challenges, Current Affairs, PYQ, Weak Practice, Warrior Battleground & Live Leaderboard.',
-        start_url: '/dashboard',
+        start_url: '/',
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: '#2563eb',
