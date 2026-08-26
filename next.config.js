@@ -1,3 +1,10 @@
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true, // auto-update — user ko manually 'Update' tap nahi karna padega, background mein hi update ho jayega
+  disable: process.env.NODE_ENV === 'development', // dev mein service worker off, caching issues se bachne ke liye
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
@@ -25,4 +32,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withPWA(nextConfig);

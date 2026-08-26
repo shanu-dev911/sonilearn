@@ -677,14 +677,14 @@ export default function PYQPage() {
                   key={i}
                   onClick={() => selectAnswer(optEn)}
                   className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${isSelected
-                      ? "border-indigo-600 bg-indigo-50/60 shadow-sm shadow-indigo-600/5 text-indigo-900"
-                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
+                    ? "border-indigo-600 bg-indigo-50/60 shadow-sm shadow-indigo-600/5 text-indigo-900"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
                     }`}
                 >
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isSelected
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
                       }`}
                   >
                     {String.fromCharCode(65 + i)}

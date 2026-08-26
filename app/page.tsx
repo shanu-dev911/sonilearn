@@ -1,6 +1,8 @@
 ﻿"use client";
 
 export const dynamic = 'force-dynamic';
+import InstallPwaBanner from "@/components/InstallPwaBanner";
+import UpdatePwaBanner from "@/components/UpdatePwaBanner";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -395,7 +397,7 @@ export default function Dashboard() {
           </div>
         </button>
 
-        {/* BUSINESS COMPLIANCE FOOTER */}
+       {/* BUSINESS COMPLIANCE FOOTER */}
         <div className="bg-white border border-slate-200/60 rounded-2xl p-4 text-center shadow-sm max-w-xl mx-auto">
           <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-bold">
             SoniLearn Core Architecture
@@ -405,6 +407,9 @@ export default function Dashboard() {
           </p>
         </div>
       </main>
+
+      <InstallPwaBanner />
+      <UpdatePwaBanner />
     </div>
   );
 }
