@@ -5,20 +5,23 @@ import type { Metadata, Viewport } from 'next';
 // 👇 Yeh line pure project ke static prerendering error ko bypass kar degi
 export const dynamic = 'force-dynamic';
 
-// 👇 PWA ke liye naya add kiya gaya
+// 👇 PWA ke liye updated metadata
 export const metadata: Metadata = {
-  manifest: '/manifest.webmanifest',
+  title: 'SoniLearn',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'SoniLearn',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
   formatDetection: {
     telephone: false,
   },
 };
 
-// 👇 PWA ke liye naya add kiya gaya (themeColor yahan jaata hai, metadata mein nahi)
+// 👇 PWA viewport settings
 export const viewport: Viewport = {
   themeColor: '#2563eb',
   width: 'device-width',
