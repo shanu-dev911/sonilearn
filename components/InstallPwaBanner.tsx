@@ -11,33 +11,33 @@ interface BeforeInstallPromptEvent extends Event {
 
 export default function InstallPwaBanner() {
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-    const [isInstalled, setIsInstalled] = useState(true); // डिफ़ॉल्ट रूप से हिडन जब तक चेक न हो जाए
+    const [isVisible, setIsVisible] = useState(false);
     const { user } = useFirebase();
 
     useEffect(() => {
-        // 1. अगर पहले से इंस्टॉल है (Local Storage या Standalone Mode में), तो बैनर बिल्कुल न दिखाएं
-        const previouslyInstalled = localStorage.getItem("sonilearn_app_installed") === "true";
-        const isStandaloneMode =
+        // अगर पहले से ऐप में है या इंस्टॉल कर चुका है तो कभी न दिखे
+        const previouslyInstalled = typeof window !== "undefined" && localStorage.getItem("sonilearn_app_installed") === "true";
+        const isStandalone = typeof window !== "undefined" && (
             window.matchMedia("(display-mode: standalone)").matches ||
-            (window.navigator as any).standalone === true;
+            (window.navigator as any).standalone === true
+        );
 
-        if (previouslyInstalled || isStandaloneMode) {
-            setIsInstalled(true);
+        if (previouslyInstalled || isStandalone) {
             return;
         }
 
-        // अगर इंस्टॉल नहीं है तो बैनर दिखाएं
-        setIsInstalled(false);
-
+        // यह इवेंट आने पर ही बैनर दिखेगा (ताकि 100% डायरेक्ट पॉपअप ही खुले)
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
             setDeferredPrompt(e as BeforeInstallPromptEvent);
+            setIsVisible(true);
         };
 
-        // 2. जैसे ही ऐप इंस्टॉल हो जाए, तुरंत गायब करें और Telegram पर डेटा भेजें
         const handleAppInstalled = async () => {
-            setIsInstalled(true);
-            localStorage.setItem("sonilearn_app_installed", "true");
+            setIsVisible(false);
+            if (typeof window !== "undefined") {
+                localStorage.setItem("sonilearn_app_installed", "true");
+            }
             setDeferredPrompt(null);
 
             try {
@@ -67,22 +67,24 @@ export default function InstallPwaBanner() {
         };
     }, [user]);
 
+    // डायरेक्ट सिस्टम इंस्टॉल ट्रिगर
     const handleInstallClick = async () => {
-        if (deferredPrompt) {
-            await deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === "accepted") {
-                setIsInstalled(true);
+        if (!deferredPrompt) return;
+
+        // सीधे Chrome का सिस्टम पॉपअप खुलेगा
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+
+        if (outcome === "accepted") {
+            setIsVisible(false);
+            if (typeof window !== "undefined") {
                 localStorage.setItem("sonilearn_app_installed", "true");
             }
-            setDeferredPrompt(null);
-        } else {
-            alert("ऐप इंस्टॉल करने के लिए ऊपर 3 डॉट्स (⋮) पर क्लिक करके 'Install app' या 'Add to Home screen' चुनें।");
         }
+        setDeferredPrompt(null);
     };
 
-    // अगर इंस्टॉल हो चुका है, तो कुछ भी रेंडर न करें (पूरी तरह गायब)
-    if (isInstalled) return null;
+    if (!isVisible || !deferredPrompt) return null;
 
     return (
         <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 bg-slate-900 border border-slate-700 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between gap-3 animate-slide-up">
