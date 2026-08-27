@@ -1,8 +1,6 @@
 ﻿"use client";
 
 export const dynamic = 'force-dynamic';
-import InstallPwaBanner from "@/components/InstallPwaBanner";
-import UpdatePwaBanner from "@/components/UpdatePwaBanner";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -12,6 +10,8 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
 import { checkTrialStatus } from "@/lib/trial-check";
 import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, ScrollText, Newspaper, X } from "lucide-react";
+import InstallPwaBanner from "@/components/InstallPwaBanner";
+import UpdatePwaBanner from "@/components/UpdatePwaBanner";
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("Student");
@@ -150,8 +150,8 @@ export default function Dashboard() {
               {/* 🎯 DYNAMIC MEMBERSHIP BADGE */}
               <div
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${isPremium
-                    ? "bg-gradient-to-r from-amber-400 to-amber-500 text-white border border-amber-300"
-                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                  ? "bg-gradient-to-r from-amber-400 to-amber-500 text-white border border-amber-300"
+                  : "bg-blue-50 text-blue-700 border border-blue-200"
                   }`}
               >
                 {isPremium ? <Crown size={10} className="sm:w-3 sm:h-3" /> : <Zap size={10} className="sm:w-3 sm:h-3" />}
@@ -397,7 +397,7 @@ export default function Dashboard() {
           </div>
         </button>
 
-       {/* BUSINESS COMPLIANCE FOOTER */}
+        {/* BUSINESS COMPLIANCE FOOTER */}
         <div className="bg-white border border-slate-200/60 rounded-2xl p-4 text-center shadow-sm max-w-xl mx-auto">
           <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-bold">
             SoniLearn Core Architecture
