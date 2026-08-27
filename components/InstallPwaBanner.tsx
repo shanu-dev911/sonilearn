@@ -15,7 +15,7 @@ export default function InstallPwaBanner() {
     const { user } = useFirebase();
 
     useEffect(() => {
-        // अगर पहले से ऐप में है या इंस्टॉल कर चुका है तो कभी न दिखे
+        // चेक करें कि क्या ऐप पहले से इंस्टॉल है
         const previouslyInstalled = typeof window !== "undefined" && localStorage.getItem("sonilearn_app_installed") === "true";
         const isStandalone = typeof window !== "undefined" && (
             window.matchMedia("(display-mode: standalone)").matches ||
@@ -26,13 +26,14 @@ export default function InstallPwaBanner() {
             return;
         }
 
-        // यह इवेंट आने पर ही बैनर दिखेगा (ताकि 100% डायरेक्ट पॉपअप ही खुले)
+        // Chrome का 1-क्लिक प्रॉम्प्ट इवेंट लिसनर
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
             setDeferredPrompt(e as BeforeInstallPromptEvent);
             setIsVisible(true);
         };
 
+        // इंस्टॉल कन्फ़र्म होने पर Telegram पर अलर्ट भेजना
         const handleAppInstalled = async () => {
             setIsVisible(false);
             if (typeof window !== "undefined") {
@@ -67,11 +68,10 @@ export default function InstallPwaBanner() {
         };
     }, [user]);
 
-    // डायरेक्ट सिस्टम इंस्टॉल ट्रिगर
+    // डायरेक्ट 1-क्लिक नेटिव इंस्टॉल ट्रिगर
     const handleInstallClick = async () => {
         if (!deferredPrompt) return;
 
-        // सीधे Chrome का सिस्टम पॉपअप खुलेगा
         await deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
 
