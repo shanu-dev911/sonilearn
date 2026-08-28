@@ -65,8 +65,6 @@ function formatTime(sec: number) {
 }
 
 // 🎯 STRONG RUNTIME RESHUFFLE — double-pass Fisher-Yates using crypto randomness
-// where available. Guarantees option order is genuinely randomized fresh every
-// single load, regardless of any pattern the questions were saved with.
 function getSecureRandom(): number {
   if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
     const arr = new Uint32Array(1);
@@ -142,7 +140,7 @@ export default function PYQPage() {
     );
   }, [questions, current, targetExam]);
 
-  // LOAD USER META DATA (target exam)
+  // LOAD USER META DATA & VERIFY LOCK/TRIAL STATUS
   useEffect(() => {
     if (authLoading) return;
 
@@ -200,7 +198,7 @@ export default function PYQPage() {
 
   // STEP 1 — CHECK HOW MANY QUESTIONS EXIST FOR THIS EXAM, SHOW INTRO SCREEN
   useEffect(() => {
-    if (!targetExam) return;
+    if (!targetExam || phase === "locked") return;
 
     async function checkPool() {
       try {
@@ -231,7 +229,7 @@ export default function PYQPage() {
     }
 
     checkPool();
-  }, [targetExam]);
+  }, [targetExam, phase]);
 
   // STEP 2 — PULL A RANDOM MIX OF QUESTIONS ACROSS ALL SUBJECTS
   const startPYQSet = async () => {
@@ -245,9 +243,6 @@ export default function PYQPage() {
 
       const examFilters = normalizeTargetExam(targetExam);
 
-      // 🎯 No subject filter — pull from EVERY subject for this exam so PYQ
-      // practice mixes Math, Reasoning, English, GK, etc. together, just
-      // like a real previous-year paper would.
       const snap = await getDocs(
         query(
           collection(db, "questions"),
@@ -274,7 +269,6 @@ export default function PYQPage() {
         const allOptionsPresent =
           data.optionA && data.optionB && data.optionC && data.optionD;
 
-        // VERIFICATION — skip invalid/incomplete questions entirely
         if (!primaryText || !allOptionsPresent || !answerValue) return;
 
         const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD];
@@ -287,8 +281,6 @@ export default function PYQPage() {
 
         const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
 
-        // 🎯 RUNTIME RESHUFFLE — options re-randomized fresh every load, so
-        // the correct answer is never always "A" or always the same slot.
         const { newOptEn, newOptHi, newCorrectText } = shuffleQuestionOptions(
           rawOptEn,
           rawOptHi,
@@ -309,8 +301,6 @@ export default function PYQPage() {
         });
       });
 
-      // 🎯 RUNTIME RESHUFFLE — the whole question set order is re-randomized
-      // fresh every time, so refreshing genuinely gives a different mix.
       arr = fisherYatesShuffle(arr).slice(0, TOTAL_QUESTIONS);
 
       if (arr.length === 0) {
@@ -437,7 +427,7 @@ export default function PYQPage() {
     );
   }
 
-  // 🔒 LOCKED — trial ended, not premium
+  // 🔒 LOCKED SCREEN UI
   if (phase === "locked") {
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
@@ -467,7 +457,7 @@ export default function PYQPage() {
     );
   }
 
-  // INTRO SCREEN — explains PYQ mode, no subject picking needed
+  // INTRO SCREEN
   if (phase === "intro") {
     return (
       <div className="min-h-screen bg-slate-50/50 pb-32">
@@ -598,7 +588,6 @@ export default function PYQPage() {
   // QUIZ SCREEN
   return (
     <div className="min-h-screen bg-slate-50/50 pb-32 antialiased text-slate-900 selection:bg-indigo-600 selection:text-white">
-
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -637,7 +626,6 @@ export default function PYQPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
-
         <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
             <div>

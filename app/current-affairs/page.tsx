@@ -53,9 +53,6 @@ const TOTAL_QUESTIONS = 30;
 const TIMER_SECONDS = 30 * 60; // 30 minutes
 const FETCH_POOL_LIMIT = 500;
 
-// 🎯 All Current Affairs questions share this exam-tag prefix, e.g.
-// "Current_Affairs_2026", and future years like "Current_Affairs_2027" will
-// automatically work too since we match by prefix, not an exact year.
 const EXAM_PREFIX = "Current_Affairs";
 
 function formatTime(sec: number) {
@@ -94,7 +91,6 @@ function shuffleQuestionOptions(optEn: string[], optHi: string[], correctIndex: 
   return { newOptEn, newOptHi, newCorrectText };
 }
 
-// 🎯 Pulls a 4-digit year out of the exam tag, e.g. "Current_Affairs_2026" -> "2026"
 function extractYear(examField: string): string {
   const match = (examField || "").match(/(\d{4})/);
   return match ? match[1] : "";
@@ -147,14 +143,6 @@ export default function CurrentAffairsPage() {
       return;
     }
 
-    checkAccessThenAvailability();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, authError]);
-
-  // 🔒 PAYWALL — Current Affairs is premium/trial-gated content.
-  const checkAccessThenAvailability = () => {
-    if (!user) return;
-
     const userRef = doc(db, "users", user.uid);
     const unsub = onSnapshot(
       userRef,
@@ -175,10 +163,10 @@ export default function CurrentAffairsPage() {
       }
     );
 
-    return unsub;
-  };
+    return () => unsub();
+  }, [user, authLoading, authError]);
 
-  // STEP 1 — CHECK HOW MANY CURRENT AFFAIRS QUESTIONS EXIST (prefix match on "exam")
+  // STEP 1 — CHECK AVAILABILITY ONLY IF UNLOCKED
   const checkAvailability = async () => {
     try {
       setError("");
@@ -207,7 +195,7 @@ export default function CurrentAffairsPage() {
     }
   };
 
-  // STEP 2 — LOAD A RANDOM SET OF CURRENT AFFAIRS QUESTIONS
+  // STEP 2 — LOAD QUESTIONS
   const startSet = async () => {
     try {
       setPhase("loading");
@@ -311,13 +299,10 @@ export default function CurrentAffairsPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // 🎯 Selecting an option locks it in immediately and reveals correctness +
-  // explanation right away, instead of waiting until the whole set ends.
   const selectAnswer = (option: string) => {
-    if (hasAnswered) return; // already answered this one — don't allow changes
+    if (hasAnswered) return;
     const updated = [...answers];
     updated[current] = option;
     setAnswers(updated);
@@ -400,7 +385,7 @@ export default function CurrentAffairsPage() {
     );
   }
 
-  // 🔒 LOCKED — trial ended, not premium
+  // 🔒 LOCKED SCREEN UI
   if (phase === "locked") {
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
@@ -446,7 +431,7 @@ export default function CurrentAffairsPage() {
                 📰 Current Affairs
               </span>
               <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
-                Free for Everyone
+                Daily Capsule
               </h1>
             </div>
           </div>
@@ -560,7 +545,6 @@ export default function CurrentAffairsPage() {
   // QUIZ SCREEN
   return (
     <div className="min-h-screen bg-slate-50/50 pb-32 antialiased text-slate-900 selection:bg-emerald-600 selection:text-white">
-
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -599,7 +583,6 @@ export default function CurrentAffairsPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
-
         <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
             <div>
@@ -636,7 +619,6 @@ export default function CurrentAffairsPage() {
               const isSelected = answers[current] === optEn;
               const isCorrect = optEn === q.answer;
 
-              // 🎯 Immediate reveal styling once this question has been answered
               let optionStyle =
                 "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800";
               if (hasAnswered) {
@@ -659,15 +641,14 @@ export default function CurrentAffairsPage() {
                   className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${optionStyle}`}
                 >
                   <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${
-                      hasAnswered && isCorrect
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${hasAnswered && isCorrect
                         ? "bg-emerald-600 text-white"
                         : hasAnswered && isSelected
-                        ? "bg-rose-600 text-white"
-                        : isSelected
-                        ? "bg-emerald-600 text-white"
-                        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                    }`}
+                          ? "bg-rose-600 text-white"
+                          : isSelected
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                      }`}
                   >
                     {String.fromCharCode(65 + i)}
                   </div>
@@ -692,7 +673,6 @@ export default function CurrentAffairsPage() {
             })}
           </div>
 
-          {/* 🎯 EXPLANATION + EXAM RELEVANCE + YEAR — shown right after answering */}
           {hasAnswered && (q.explanationEn || q.explanationHi || q.examTag || q.yearLabel) && (
             <div className="mt-6 bg-blue-50/80 border border-blue-200 rounded-2xl p-5 animate-in fade-in duration-300">
               {(q.explanationEn || q.explanationHi) && (
@@ -740,11 +720,10 @@ export default function CurrentAffairsPage() {
             <button
               onClick={nextQuestion}
               disabled={!hasAnswered}
-              className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${
-                hasAnswered
+              className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${hasAnswered
                   ? "bg-slate-900 hover:bg-slate-800 text-white"
                   : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
-              }`}
+                }`}
             >
               {current === questions.length - 1 ? (
                 <>
