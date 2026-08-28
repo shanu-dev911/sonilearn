@@ -1,5 +1,6 @@
 import './globals.css';
 import { FirebaseProvider } from '@/context/FirebaseContext';
+import InstallPromptManager from '@/components/InstallPromptManager';
 import type { Metadata, Viewport } from 'next';
 
 // 👇 Yeh line pure project ke static prerendering error ko bypass kar degi
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <FirebaseProvider>
+          <InstallPromptManager />
           {children}
         </FirebaseProvider>
       </body>

@@ -37,6 +37,13 @@ export default function InstallPwaBanner() {
 
         setIsVisible(true);
 
+        // 🎯 If the global InstallPromptManager (in layout.tsx) already
+        // captured the event before this component mounted, reuse it here.
+        const existingPrompt = (window as any).deferredInstallPrompt;
+        if (existingPrompt) {
+            setDeferredPrompt(existingPrompt);
+        }
+
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
             setDeferredPrompt(e as BeforeInstallPromptEvent);
