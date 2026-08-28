@@ -5,36 +5,47 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { name, email, phone, uid } = body;
 
-        const BOT_TOKEN = process.env.TELEGRAM_INSTALL_BOT_TOKEN;
-        const CHAT_ID = process.env.TELEGRAM_INSTALL_CHAT_ID;
+        // 🎯 Reuse the same Telegram bot already used for feedback notifications
+        const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+        const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
         if (!BOT_TOKEN || !CHAT_ID) {
-            return NextResponse.json({ success: false, message: 'Telegram credentials missing' });
+            console.error('Telegram credentials missing on server!');
+            return NextResponse.json({ success: false, message: 'Telegram credentials missing' }, { status: 500 });
         }
 
         const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
+        // 🎯 Plain text — avoids Markdown parse failures from special characters
         const message =
-            `🎉 *New SoniLearn App Installed!*\n\n` +
-            `👤 *User Name:* ${name}\n` +
-            `📧 *Email:* ${email}\n` +
-            `📞 *Phone:* ${phone}\n` +
-            `🆔 *UID:* ${uid}\n` +
-            `⏰ *Time:* ${time}`;
+            'New SoniLearn App Installed!\n\n' +
+            'User Name: ' + (name || 'Unknown') + '\n' +
+            'Email: ' + (email || 'N/A') + '\n' +
+            'Phone: ' + (phone || 'N/A') + '\n' +
+            'UID: ' + (uid || 'N/A') + '\n' +
+            'Time: ' + time;
 
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const telegramUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+        const res = await fetch(telegramUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: CHAT_ID,
                 text: message,
-                parse_mode: 'Markdown',
             }),
         });
+
+        const data = await res.json();
+
+        if (!data.ok) {
+            console.error('Telegram API Rejection:', data);
+            return NextResponse.json({ success: false, error: data.description }, { status: 400 });
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Install track error:', error);
-        return NextResponse.json({ success: false });
+        return NextResponse.json({ success: false }, { status: 500 });
     }
 }
