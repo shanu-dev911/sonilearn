@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Loader2, Check, RefreshCw } from "lucide-react";
-import { useFirebase } from "@/context/FirebaseContext";
+import { Download, Loader2, Check, RefreshCw, X } from "lucide-react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase-client";
 
 interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
@@ -15,26 +16,31 @@ export default function InstallPwaBanner() {
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [status, setStatus] = useState<BannerState>("idle");
-    const { user } = useFirebase();
+    const [currentUser, setCurrentUser] = useState<any>(null);
+
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (u) => setCurrentUser(u));
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         const previouslyInstalled = typeof window !== "undefined" && localStorage.getItem("sonilearn_app_installed") === "true";
+        const dismissed = typeof window !== "undefined" && sessionStorage.getItem("sonilearn_install_dismissed") === "true";
         const isStandalone = typeof window !== "undefined" && (
             window.matchMedia("(display-mode: standalone)").matches ||
             (window.navigator as any).standalone === true
         );
 
-        if (previouslyInstalled || isStandalone) {
-            return; // already installed — banner kabhi nahi dikhega
+        if (previouslyInstalled || isStandalone || dismissed) {
+            return;
         }
 
-        // 👇 Banner ab turant dikhega, beforeinstallprompt event ka wait nahi karega
         setIsVisible(true);
 
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
             setDeferredPrompt(e as BeforeInstallPromptEvent);
-            setStatus("idle"); // naya prompt mil gaya, wapas normal "Install" button dikhao
+            setStatus("idle");
         };
 
         const handleAppInstalled = async () => {
@@ -43,19 +49,18 @@ export default function InstallPwaBanner() {
                 localStorage.setItem("sonilearn_app_installed", "true");
             }
             setDeferredPrompt(null);
-            setTimeout(() => setIsVisible(false), 1800); // sirf ab hide hoga — sirf installed hone par
+            setTimeout(() => setIsVisible(false), 1800);
 
             try {
-                const userData = {
-                    name: user?.displayName || "Guest / Unauthenticated User",
-                    email: user?.email || "No Email Provided",
-                    phone: user?.phoneNumber || "No Phone Provided",
-                    uid: user?.uid || "guest_user",
-                };
                 await fetch("/api/track-install", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(userData),
+                    body: JSON.stringify({
+                        name: currentUser?.displayName || "Guest / Unauthenticated User",
+                        email: currentUser?.email || "No Email Provided",
+                        phone: currentUser?.phoneNumber || "No Phone Provided",
+                        uid: currentUser?.uid || "guest_user",
+                    }),
                 });
             } catch (err) {
                 console.error("Install tracking failed:", err);
@@ -69,14 +74,12 @@ export default function InstallPwaBanner() {
             window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
             window.removeEventListener("appinstalled", handleAppInstalled);
         };
-    }, [user]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser]);
 
     const handleInstallClick = async () => {
         if (status === "installing") return;
 
-        // Agar browser ka native prompt is waqt available nahi hai
-        // (pehle use ho chuka hai is session mein), to seedha reload maango —
-        // isse dobara beforeinstallprompt fire hota hai
         if (!deferredPrompt) {
             setStatus("needs_reload");
             return;
@@ -88,25 +91,29 @@ export default function InstallPwaBanner() {
             const { outcome } = await deferredPrompt.userChoice;
 
             if (outcome !== "accepted") {
-                // Cancel dabaya — banner GAYAB NAHI hoga, bas wapas normal state
                 setStatus("idle");
-                setDeferredPrompt(null); // ye event ab consume ho chuka, dobara use nahi ho sakta
+                setDeferredPrompt(null);
             }
-            // agar accepted, status "installing" hi rahega jab tak asli 'appinstalled' event na aaye
         } catch (err) {
             console.error("Install prompt failed:", err);
             setStatus("idle");
         }
     };
 
+    const handleDismiss = () => {
+        setIsVisible(false);
+        if (typeof window !== "undefined") {
+            sessionStorage.setItem("sonilearn_install_dismissed", "true");
+        }
+    };
+
     if (!isVisible) return null;
 
     return (
-        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 bg-slate-900 border border-slate-700 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between gap-3 animate-slide-up">
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 bg-white border border-slate-200 text-slate-900 p-4 rounded-2xl shadow-2xl shadow-slate-900/10 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center gap-3 min-w-0">
-                <div className={`p-2 rounded-lg text-white shrink-0 transition-colors ${
-                    status === "installed" ? "bg-emerald-600" : "bg-blue-600"
-                }`}>
+                <div className={`p-2.5 rounded-xl text-white shrink-0 transition-colors ${status === "installed" ? "bg-emerald-500" : "bg-blue-600"
+                    }`}>
                     {status === "installed" ? (
                         <Check className="w-5 h-5" />
                     ) : status === "installing" ? (
@@ -118,35 +125,45 @@ export default function InstallPwaBanner() {
                     )}
                 </div>
                 <div className="min-w-0">
-                    <h4 className="text-sm font-semibold truncate">
+                    <h4 className="text-sm font-bold text-slate-900 truncate">
                         {status === "installed"
                             ? "Installed! 🎉"
                             : status === "installing"
-                            ? "Installing SoniLearn..."
-                            : status === "needs_reload"
-                            ? "Page reload karo"
-                            : "Install SoniLearn App"}
+                                ? "Installing SoniLearn..."
+                                : status === "needs_reload"
+                                    ? "Reload to continue"
+                                    : "Install SoniLearn App"}
                     </h4>
-                    <p className="text-xs text-slate-300 truncate">
+                    <p className="text-xs text-slate-500 truncate">
                         {status === "installed"
-                            ? "App aapke home screen par hai"
+                            ? "App is now on your home screen"
                             : status === "installing"
-                            ? "Ek pal ruko, complete ho raha hai"
-                            : status === "needs_reload"
-                            ? "Fir se Install button milega"
-                            : "Fast access & daily practice"}
+                                ? "Just a moment..."
+                                : status === "needs_reload"
+                                    ? "Tap reload to try installing again"
+                                    : "Fast access, offline-friendly practice"}
                     </p>
                 </div>
             </div>
 
-            {(status === "idle" || status === "needs_reload") && (
-                <button
-                    onClick={status === "needs_reload" ? () => window.location.reload() : handleInstallClick}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition active:scale-95 shadow-md shrink-0"
-                >
-                    {status === "needs_reload" ? "Reload" : "Install"}
-                </button>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+                {(status === "idle" || status === "needs_reload") && (
+                    <button
+                        onClick={status === "needs_reload" ? () => window.location.reload() : handleInstallClick}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition active:scale-95 shadow-md"
+                    >
+                        {status === "needs_reload" ? "Reload" : "Install"}
+                    </button>
+                )}
+                {status === "idle" && (
+                    <button
+                        onClick={handleDismiss}
+                        className="text-slate-400 hover:text-slate-600 p-1"
+                    >
+                        <X size={16} />
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
