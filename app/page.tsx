@@ -323,7 +323,7 @@ export default function Dashboard() {
 
             <div className="hidden sm:block w-36 md:w-44 flex-shrink-0 -mb-8">
               <Image
-                src="/ram.png.peg"
+                src="/siyaram.png.png"
                 alt="Study Buddy"
                 width={200}
                 height={260}
