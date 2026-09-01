@@ -239,10 +239,11 @@ export default function Dashboard() {
         {/* ENTERPRISE METRICS SECTION */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           {[
-            { label: "Daily Status", val: "Calibrated", desc: "System operational", color: "text-blue-600" },
-            { label: "Core Focus", val: "All Active", desc: "4 tracks sync", color: "text-indigo-600" },
-            { label: "Velocity", val: "Instant", desc: "Rapid access live", color: "text-amber-600" },
-            { label: "Security", val: "Verified", desc: "Cloud locked", color: "text-emerald-600" }
+            { label: "Daily Target", val: "Ready", desc: "Roz nayi jeet ki taiyari", color: "text-blue-600" },
+            { label: "Core Focus", val: "100% Active", desc: "Exam-oriented practice", color: "text-indigo-600" },
+            { label: "Speed Test", val: "Lightning", desc: "Beat your own timer", color: "text-amber-600" },
+            { label: "Your Rank", val: "Unleash", desc: "Climb to the top", color: "text-emerald-600" }
+          
           ].map((item, idx) => (
             <div key={idx} className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm">
               <p className="text-[9px] sm:text-[11px] text-slate-500 font-bold uppercase tracking-wider truncate">{item.label}</p>
