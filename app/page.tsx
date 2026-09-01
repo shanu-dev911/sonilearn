@@ -223,7 +223,7 @@ export default function Dashboard() {
                 {isPremium ? "Premium Workspace" : "Workspace Active"}
               </div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight">
-                Welcome , {userName}
+               Warrior {userName}
               </h2>
               <p className="text-slate-400 mt-2 text-xs sm:text-sm md:text-base max-w-xl font-medium leading-relaxed">
                 Jo apne kadmon ki kaabiliyat par vishwas rakhte hain wahi aksar manzil tak pahunchte hain aaj ka ek-ek ghanta tumhari taakat banegaur 🔥
