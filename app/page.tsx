@@ -226,7 +226,7 @@ export default function Dashboard() {
                 Welcome , {userName}
               </h2>
               <p className="text-slate-400 mt-2 text-xs sm:text-sm md:text-base max-w-xl font-medium leading-relaxed">
-                Your performance track is calibrated. Access your modules below to continue your dynamic assessment pipeline.
+                Jo apne kadmon ki kaabiliyat par vishwas rakhte hain wahi aksar manzil tak pahunchte hain aaj ka ek-ek ghanta tumhari taakat banegaur 🔥
               </p>
             </div>
             <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 min-w-[180px] sm:min-w-[200px] flex flex-col justify-center">
