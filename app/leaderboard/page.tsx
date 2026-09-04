@@ -270,7 +270,7 @@ export default function LeaderboardPage() {
                         onClick={() => router.push("/")}
                         className="w-full mt-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold h-11 rounded-xl text-xs uppercase tracking-wider"
                     >
-                        Go Back
+                    
                     </button>
                 </div>
             </div>
