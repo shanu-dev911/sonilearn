@@ -409,7 +409,7 @@ export default function Dashboard() {
                 SoniLearn Educational Platform
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 leading-relaxed">
-                Empowering students across India with daily high-yield questions, focused revision, and real-time performance metrics.
+                  Helping students across India with daily practice questions, fast revision, and live results.
               </p>
             </div>
 
