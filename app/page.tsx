@@ -9,7 +9,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
 import { checkTrialStatus } from "@/lib/trial-check";
-import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, ScrollText, Newspaper, X } from "lucide-react";
+import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, ScrollText, Newspaper, X, Instagram, Facebook, Youtube, Linkedin, Heart } from "lucide-react";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import UpdatePwaBanner from "@/components/UpdatePwaBanner";
 
@@ -223,7 +223,7 @@ export default function Dashboard() {
                 {isPremium ? "Premium Workspace" : "Workspace Active"}
               </div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight">
-               Warrior {userName}
+                Warrior {userName}
               </h2>
               <p className="text-slate-400 mt-2 text-xs sm:text-sm md:text-base max-w-xl font-medium leading-relaxed">
                 Jo apne kadmon ki kaabiliyat par vishwas rakhte hain wahi aksar manzil tak pahunchte hain aaj ka ek-ek ghanta tumhari taakat banegaur 🔥
@@ -243,7 +243,6 @@ export default function Dashboard() {
             { label: "Core Focus", val: "100% Active", desc: "Exam-oriented practice", color: "text-indigo-600" },
             { label: "Speed Test", val: "Lightning", desc: "Beat your own timer", color: "text-amber-600" },
             { label: "Your Rank", val: "Unleash", desc: "Climb to the top", color: "text-emerald-600" }
-          
           ].map((item, idx) => (
             <div key={idx} className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm">
               <p className="text-[9px] sm:text-[11px] text-slate-500 font-bold uppercase tracking-wider truncate">{item.label}</p>
@@ -325,7 +324,7 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* CURRENT AFFAIRS CARD (ADDED) */}
+          {/* CURRENT AFFAIRS CARD */}
           <button
             onClick={() => router.push("/current-affairs")}
             className="group relative bg-white border border-slate-200 hover:border-emerald-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
@@ -398,15 +397,91 @@ export default function Dashboard() {
           </div>
         </button>
 
-        {/* BUSINESS COMPLIANCE FOOTER */}
-        <div className="bg-white border border-slate-200/60 rounded-2xl p-4 text-center shadow-sm max-w-xl mx-auto">
-          <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-            SoniLearn Core Architecture
-          </p>
-          <p className="text-slate-500 italic text-[11px] sm:text-xs font-medium mt-1.5">
-            "Consistency beats motivation. Practice every single day."
-          </p>
-        </div>
+        {/* 🌟 PROFESSIONAL FOUNDER, ABOUT & SOCIAL FOOTER */}
+        <footer className="mt-8 mb-6 bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-sm text-center">
+          <div className="max-w-2xl mx-auto space-y-5">
+            {/* BRAND & FOUNDER INFO */}
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black uppercase tracking-wider mb-2.5">
+                <Heart size={11} className="text-red-500 fill-red-500" /> Made for Aspirants
+              </div>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                SoniLearn Educational Platform
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 leading-relaxed">
+                Empowering students across India with daily high-yield questions, focused revision, and real-time performance metrics.
+              </p>
+            </div>
+
+            {/* FOUNDER TAG */}
+            <div className="pt-2 border-t border-slate-100">
+              <p className="text-xs text-slate-600 font-semibold">
+                Designed & Developed by{" "}
+                <span className="font-black text-slate-900">Shanu Sharma</span>
+                <span className="text-slate-400 block sm:inline sm:ml-1 text-[11px]">
+                  (Founder & Lead Architect)
+                </span>
+              </p>
+            </div>
+
+            {/* SOCIAL MEDIA CHANNELS */}
+            <div className="pt-1">
+              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-3">
+                Connect With Us
+              </span>
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                {/* Instagram */}
+                <a
+                  href="https://www.instagram.com/sonilearn.in/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 text-pink-600 flex items-center justify-center hover:bg-pink-50 hover:border-pink-200 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                >
+                  <Instagram size={18} />
+                </a>
+
+                {/* Facebook */}
+                <a
+                  href="https://www.facebook.com/sonilearn.official"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 text-blue-600 flex items-center justify-center hover:bg-blue-50 hover:border-blue-200 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                >
+                  <Facebook size={18} />
+                </a>
+
+                {/* YouTube */}
+                <a
+                  href="https://www.youtube.com/@sonilearnin"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="YouTube"
+                  className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 text-red-600 flex items-center justify-center hover:bg-red-50 hover:border-red-200 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                >
+                  <Youtube size={18} />
+                </a>
+
+                {/* LinkedIn */}
+                <a
+                  href="https://www.linkedin.com/in/shanu-sharma-9a4950432/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="LinkedIn"
+                  className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 text-blue-700 flex items-center justify-center hover:bg-sky-50 hover:border-sky-200 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                >
+                  <Linkedin size={18} />
+                </a>
+              </div>
+            </div>
+
+            {/* COPYRIGHT NOTICE */}
+            <div className="pt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+              © {new Date().getFullYear()} SoniLearn. All rights reserved.
+            </div>
+          </div>
+        </footer>
       </main>
 
       <InstallPwaBanner />
