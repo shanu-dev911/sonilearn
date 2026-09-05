@@ -296,7 +296,7 @@ export default function Dashboard() {
                 Weak Practice
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-                Isolate historical structural errors. Focus resources directly onto high-error components.
+                Pehle ki gayi galtiyon ko sudharo aur kamzor topics par focus karke score badhao.
               </p>
             </div>
           </button>
@@ -319,7 +319,7 @@ export default function Dashboard() {
                 PYQ Practice
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-                Previous year mixed questions across every subject — fresh random set every attempt.
+              Har attempt mein naye PYQs — real exam pattern par daily practice
               </p>
             </div>
           </button>
@@ -342,7 +342,7 @@ export default function Dashboard() {
                 Current Affairs
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-                Stay updated with a dedicated set of 20 high-yield current affairs questions.
+                Exam ke liye sabse zaroori 30 current affairs sawal — roz naya update
               </p>
             </div>
           </button>
@@ -365,7 +365,7 @@ export default function Dashboard() {
                 Leaderboard Matrix
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-                Review verified performance tracking data across peer student demographics nationwide.
+                Live Leaderboard par apni rank aur overall performance check karo
               </p>
             </div>
           </button>
@@ -388,7 +388,7 @@ export default function Dashboard() {
                 🎯 Warrior Battle Questions
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs font-medium leading-normal">
-                Initiate a high-velocity evaluation cycle for structural review.
+                High-level Maths aur Reasoning questions — topper level practice.
               </p>
             </div>
           </div>
