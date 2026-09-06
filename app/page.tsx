@@ -273,7 +273,7 @@ export default function Dashboard() {
                 Daily Challenge
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-                Execute a fresh set of 20 calibrated items daily to measure national placement matrix.
+                Execute a fresh set of 30 calibrated items daily to measure national placement matrix.
               </p>
             </div>
           </button>
