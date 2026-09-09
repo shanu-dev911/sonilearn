@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin
 Disallow: /api/
 
-Sitemap: https://sonilearn.in/sitemap.xml
+Sitemap: https://www.sonilearn.in/sitemap.xml

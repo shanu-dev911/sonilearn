@@ -1,37 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://sonilearn.in</loc>
+    <loc>https://www.sonilearn.in</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://sonilearn.in/daily</loc>
+    <loc>https://www.sonilearn.in/daily</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://sonilearn.in/mock-test/live</loc>
+    <loc>https://www.sonilearn.in/mock-test/live</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://sonilearn.in/leaderboard</loc>
+    <loc>https://www.sonilearn.in/leaderboard</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://sonilearn.in/pyq</loc>
+    <loc>https://www.sonilearn.in/pyq</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://sonilearn.in/practice</loc>
+    <loc>https://www.sonilearn.in/practice</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://sonilearn.in/current-affairs</loc>
+    <loc>https://www.sonilearn.in/current-affairs</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>

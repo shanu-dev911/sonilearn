@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 // 👇 PWA + SEO + Google Search Console Verification ke liye updated metadata
 export const metadata: Metadata = {
-  metadataBase: new URL('https://sonilearn.in'),
+  metadataBase: new URL('https://www.sonilearn.in'),
   title: {
     default: 'SoniLearn - Daily Challenge, Battleground, PYQ & Current Affairs',
     template: '%s | SoniLearn',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'SoniLearn - Daily Challenge, Warrior Battleground & PYQ',
     description: 'Take daily challenges, compete in Warrior Battleground, climb the All India Leaderboard, practice PYQ and weak topics, and read current affairs.',
-    url: 'https://sonilearn.in',
+    url: 'https://www.sonilearn.in',
     siteName: 'SoniLearn',
     locale: 'en_IN',
     type: 'website',
