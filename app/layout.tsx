@@ -10,23 +10,27 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   metadataBase: new URL('https://sonilearn.in'),
   title: {
-    default: 'SoniLearn - Daily Learning Challenges & Skill Quizzes',
+    default: 'SoniLearn - Daily Challenge, Battleground, PYQ & Current Affairs',
     template: '%s | SoniLearn',
   },
-  description: 'Solve daily challenges, improve your skills every day, maintain streaks, and compete on the SoniLearn leaderboard.',
+  description: 'Prepare smarter with SoniLearn Daily Challenges, Warrior Battleground competitions, All India Leaderboard, PYQ, Weak Practice, Quick Practice, and Daily Current Affairs.',
   keywords: [
     'SoniLearn',
     'Daily Challenge',
-    'Daily Quiz',
-    'Daily Learning Challenge',
-    'Online Challenges',
-    'Skill Practice',
-    'Daily Streak',
+    'Daily Challenges and Streaks',
+    'Warrior Battleground',
+    'Live Quiz Battle',
+    'All India Leaderboard',
+    'Previous Year Questions',
+    'PYQ Practice',
+    'Weak Practice',
+    'Quick Practice',
+    'Daily Current Affairs',
   ],
   authors: [{ name: 'SoniLearn Team' }],
   openGraph: {
-    title: 'SoniLearn - Take Today’s Challenge',
-    description: 'Solve daily challenges, test your knowledge, and build your learning streak every day on SoniLearn.',
+    title: 'SoniLearn - Daily Challenge, Warrior Battleground & PYQ',
+    description: 'Take daily challenges, compete in Warrior Battleground, climb the All India Leaderboard, practice PYQ and weak topics, and read current affairs.',
     url: 'https://sonilearn.in',
     siteName: 'SoniLearn',
     locale: 'en_IN',
@@ -48,8 +52,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   verification: {
-    // 👇 Search Console se milne wala HTML tag ka content code yahan paste karein
-    google: 'YOUR_SEARCH_CONSOLE_VERIFICATION_CODE',
+    google: 'YOUR_VERIFICATION_CODE',
   },
 };
 
