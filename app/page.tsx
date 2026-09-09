@@ -226,7 +226,7 @@ export default function Dashboard() {
                 Warrior {userName}
               </h2>
               <p className="text-slate-400 mt-2 text-xs sm:text-sm md:text-base max-w-xl font-medium leading-relaxed">
-                Jo apne kadmon ki kaabiliyat par vishwas rakhte hain wahi aksar manzil tak pahunchte hain aaj ka ek-ek ghanta tumhari taakat banegaur 🔥
+                Jo apne kadmon ki kaabiliyat par vishwas rakhte hain wahi aksar manzil tak pahunchte hain aaj ka ek-ek ghanta tumhari taakat banega🔥
               </p>
             </div>
             <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 min-w-[180px] sm:min-w-[200px] flex flex-col justify-center">

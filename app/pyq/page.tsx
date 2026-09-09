@@ -134,6 +134,8 @@ export default function PYQPage() {
   const [error, setError] = useState("");
   const [targetExam, setTargetExam] = useState("");
   const [poolSize, setPoolSize] = useState(0);
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState("All Subjects");
   const [user, authLoading, authError] = useAuthState(auth);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -234,7 +236,24 @@ export default function PYQPage() {
           return;
         }
 
+        const subjects: string[] = Array.from(
+          new Set<string>(
+            snap.docs
+              .map((doc) => {
+                const data = doc.data();
+                return String(data.subject || data.topic || "").trim();
+              })
+              .filter((subject): subject is string => subject.length > 0)
+          )
+        ).sort();
+
         setPoolSize(snap.size);
+        setAvailableSubjects(subjects);
+        setSelectedSubject((currentSubject) =>
+          currentSubject === "All Subjects" || subjects.includes(currentSubject)
+            ? currentSubject
+            : "All Subjects"
+        );
         setPhase("intro");
       } catch (err) {
         console.error(err);
@@ -285,6 +304,11 @@ export default function PYQPage() {
 
         if (!primaryText || !allOptionsPresent || !answerValue) return;
 
+        const subject = String(data.subject || data.topic || "").trim();
+        if (selectedSubject !== "All Subjects" && subject !== selectedSubject) {
+          return;
+        }
+
         const rawOptEn = rawOptions;
         const rawOptHi = [
           String(data.optionAHi || optionMap.A),
@@ -311,14 +335,18 @@ export default function PYQPage() {
           optionsHi: newOptHi,
           answer: newCorrectText,
           examName: data.exam || targetExam,
-          topic: data.subject || data.topic || targetExam,
+          topic: subject || targetExam,
         });
       });
 
       arr = fisherYatesShuffle(arr).slice(0, TOTAL_QUESTIONS);
 
       if (arr.length === 0) {
-        setError(`No verified questions found for ${targetExam}.`);
+        setError(
+          selectedSubject === "All Subjects"
+            ? `No verified questions found for ${targetExam}.`
+            : `No verified ${selectedSubject} questions found for ${targetExam}.`
+        );
         setPhase("result");
         return;
       }
@@ -501,11 +529,32 @@ export default function PYQPage() {
             </div>
             <h2 className="text-xl font-black text-slate-900 mb-2">PYQ Practice Set</h2>
             <p className="text-slate-500 text-sm leading-relaxed mb-1">
-              {TOTAL_QUESTIONS} random questions mixed across every subject for {targetExam} — Math, Reasoning, English, GK, all together, just like a real paper.
+              {TOTAL_QUESTIONS} random questions for {targetExam}, selected from the subject below.
             </p>
             <p className="text-slate-400 text-xs mb-6">
-              {poolSize}+ questions in the bank • fresh random mix every attempt
+              {poolSize}+ questions in the bank • fresh random set every attempt
             </p>
+
+            <div className="text-left mb-6">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
+                Choose Subject
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {["All Subjects", ...availableSubjects].map((subject) => (
+                  <button
+                    key={subject}
+                    type="button"
+                    onClick={() => setSelectedSubject(subject)}
+                    className={`min-h-10 rounded-xl border px-3 py-2 text-xs font-bold transition-all ${selectedSubject === subject
+                      ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50"
+                      }`}
+                  >
+                    {subject}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <button
               onClick={startPYQSet}
