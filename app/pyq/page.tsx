@@ -108,6 +108,21 @@ const normalizeTargetExam = (exam: string) => {
   );
 };
 
+const getAnswerKey = (answer: unknown, options: string[]) => {
+  const normalizedAnswer = String(answer ?? "").trim();
+  const answerKey = normalizedAnswer.toUpperCase();
+
+  if (["A", "B", "C", "D"].includes(answerKey)) {
+    return answerKey;
+  }
+
+  const answerIndex = options.findIndex(
+    (option) => option.trim().toLowerCase() === normalizedAnswer.toLowerCase()
+  );
+
+  return answerIndex >= 0 ? ["A", "B", "C", "D"][answerIndex] : "";
+};
+
 export default function PYQPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
@@ -198,7 +213,7 @@ export default function PYQPage() {
 
   // STEP 1 — CHECK HOW MANY QUESTIONS EXIST FOR THIS EXAM, SHOW INTRO SCREEN
   useEffect(() => {
-    if (!targetExam || phase === "locked") return;
+    if (!targetExam) return;
 
     async function checkPool() {
       try {
@@ -229,7 +244,7 @@ export default function PYQPage() {
     }
 
     checkPool();
-  }, [targetExam, phase]);
+  }, [targetExam]);
 
   // STEP 2 — PULL A RANDOM MIX OF QUESTIONS ACROSS ALL SUBJECTS
   const startPYQSet = async () => {
@@ -255,28 +270,27 @@ export default function PYQPage() {
 
       snap.forEach((d) => {
         const data: any = d.data();
-        const answerKey = data.answer?.toString().toUpperCase();
-
         const optionMap: Record<string, string> = {
-          A: data.optionA,
-          B: data.optionB,
-          C: data.optionC,
-          D: data.optionD,
+          A: String(data.optionA ?? "").trim(),
+          B: String(data.optionB ?? "").trim(),
+          C: String(data.optionC ?? "").trim(),
+          D: String(data.optionD ?? "").trim(),
         };
+        const rawOptions = [optionMap.A, optionMap.B, optionMap.C, optionMap.D];
+        const answerKey = getAnswerKey(data.answer, rawOptions);
         const answerValue = optionMap[answerKey];
 
-        const primaryText = data.questionEn || data.question || "";
-        const allOptionsPresent =
-          data.optionA && data.optionB && data.optionC && data.optionD;
+        const primaryText = String(data.questionEn || data.question || "").trim();
+        const allOptionsPresent = rawOptions.every(Boolean);
 
         if (!primaryText || !allOptionsPresent || !answerValue) return;
 
-        const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD];
+        const rawOptEn = rawOptions;
         const rawOptHi = [
-          data.optionAHi || data.optionA,
-          data.optionBHi || data.optionB,
-          data.optionCHi || data.optionC,
-          data.optionDHi || data.optionD,
+          String(data.optionAHi || optionMap.A),
+          String(data.optionBHi || optionMap.B),
+          String(data.optionCHi || optionMap.C),
+          String(data.optionDHi || optionMap.D),
         ];
 
         const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
