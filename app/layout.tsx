@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   verification: {
-    google: 'YOUR_VERIFICATION_CODE',
+    google: 'PgGMKb0_JqwPrxpZmggy-9LV48ghIV-UQuOCS09KBDY',
   },
 };
 
