@@ -1,5 +1,10 @@
 User-agent: *
 Allow: /
+Allow: /logo.svg
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
 Disallow: /admin
 Disallow: /api/
 
