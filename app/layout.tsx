@@ -6,7 +6,7 @@ import type { Metadata, Viewport } from 'next';
 // 👇 Yeh line pure project ke static prerendering error ko bypass kar degi
 export const dynamic = 'force-dynamic';
 
-// 👇 PWA + SEO + Google Search Console Verification ke liye updated metadata
+// 👇 PWA + SEO + Google Search Console + Custom Logo Favicon metadata
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.sonilearn.in'),
   title: {
@@ -28,11 +28,28 @@ export const metadata: Metadata = {
     'Daily Current Affairs',
   ],
   authors: [{ name: 'SoniLearn Team' }],
+  icons: {
+    icon: [
+      { url: '/logo.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: ['/logo.svg'],
+    apple: [
+      { url: '/logo.svg' },
+    ],
+  },
   openGraph: {
     title: 'SoniLearn - Daily Challenge, Warrior Battleground & PYQ',
     description: 'Take daily challenges, compete in Warrior Battleground, climb the All India Leaderboard, practice PYQ and weak topics, and read current affairs.',
     url: 'https://www.sonilearn.in',
     siteName: 'SoniLearn',
+    images: [
+      {
+        url: '/logo.svg',
+        width: 800,
+        height: 600,
+        alt: 'SoniLearn Logo',
+      },
+    ],
     locale: 'en_IN',
     type: 'website',
   },
@@ -68,6 +85,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+      </head>
       <body>
         <FirebaseProvider>
           <InstallPromptManager />
