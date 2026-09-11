@@ -30,11 +30,12 @@ export const metadata: Metadata = {
   authors: [{ name: 'SoniLearn Team' }],
   icons: {
     icon: [
-      { url: '/logo.svg', type: 'image/svg+xml' },
+      { url: '/icon-192x192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icon-512x512.png', type: 'image/png', sizes: '512x512' },
     ],
-    shortcut: ['/logo.svg'],
+    shortcut: ['/icon-192x192.png'],
     apple: [
-      { url: '/logo.svg' },
+      { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
     ],
   },
   openGraph: {
@@ -86,9 +87,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
-        <link rel="shortcut icon" href="/logo.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/logo.svg" />
+        <link rel="icon" href="/icon-192x192.png" type="image/png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" sizes="192x192" />
       </head>
       <body>
         <FirebaseProvider>
