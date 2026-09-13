@@ -30,7 +30,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
-import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, ScrollText, Lock, Crown } from "lucide-react";
+import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, ScrollText, Lock, Crown, Calendar, Layers } from "lucide-react";
 import { checkTrialStatus } from "@/lib/trial-check";
 
 interface Question {
@@ -44,6 +44,8 @@ interface Question {
   answer: string;
   examName?: string;
   topic?: string;
+  year?: string | number;
+  shift?: string;
 }
 
 type Phase =
@@ -56,7 +58,7 @@ type Phase =
 
 const TOTAL_QUESTIONS = 30;
 const TIMER_SECONDS = 30 * 60; // 30 minutes
-const FETCH_POOL_LIMIT = 500; // pull a big pool per exam so the 30 shown are genuinely random
+const FETCH_POOL_LIMIT = 500;
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -64,7 +66,7 @@ function formatTime(sec: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// 🎯 STRONG RUNTIME RESHUFFLE — double-pass Fisher-Yates using crypto randomness
+// 🎯 Fisher-Yates shuffle with crypto randomness
 function getSecureRandom(): number {
   if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
     const arr = new Uint32Array(1);
@@ -134,10 +136,18 @@ export default function PYQPage() {
   const [error, setError] = useState("");
   const [targetExam, setTargetExam] = useState("");
   const [poolSize, setPoolSize] = useState(0);
+
+  // Dynamic Filters
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("All Subjects");
-  const [user, authLoading, authError] = useAuthState(auth);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState("All Years");
+  const [availableShifts, setAvailableShifts] = useState<string[]>([]);
+  const [selectedShift, setSelectedShift] = useState("All Shifts");
 
+  const [rawDocsData, setRawDocsData] = useState<any[]>([]);
+
+  const [user, authLoading, authError] = useAuthState(auth);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const q = useMemo(() => {
@@ -186,7 +196,6 @@ export default function PYQPage() {
 
         const data = snap.data();
 
-        // 🔒 PAYWALL — PYQ Practice is premium/trial-gated content.
         const trialStatus = checkTrialStatus(data);
         if (!trialStatus.hasAccess) {
           setPhase("locked");
@@ -213,7 +222,7 @@ export default function PYQPage() {
     return () => unsubscribe();
   }, [user, authLoading, authError]);
 
-  // STEP 1 — CHECK HOW MANY QUESTIONS EXIST FOR THIS EXAM, SHOW INTRO SCREEN
+  // STEP 1 — PULL QUESTION POOL AND EXTRACT YEARS, SHIFTS, AND SUBJECTS
   useEffect(() => {
     if (!targetExam) return;
 
@@ -236,24 +245,41 @@ export default function PYQPage() {
           return;
         }
 
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setRawDocsData(docs);
+
+        // Extract Subjects
         const subjects: string[] = Array.from(
           new Set<string>(
-            snap.docs
-              .map((doc) => {
-                const data = doc.data();
-                return String(data.subject || data.topic || "").trim();
-              })
-              .filter((subject): subject is string => subject.length > 0)
+            docs
+              .map((data: any) => String(data.subject || data.topic || "").trim())
+              .filter((s: string): s is string => s.length > 0)
+          )
+        ).sort();
+
+        // Extract Years (2016-2026 format)
+        const years: string[] = Array.from(
+          new Set<string>(
+            docs
+              .map((data: any) => String(data.year || "").trim())
+              .filter((y: string): y is string => y.length > 0)
+          )
+        ).sort((a, b) => Number(b) - Number(a));
+
+        // Extract Shifts
+        const shifts: string[] = Array.from(
+          new Set<string>(
+            docs
+              .map((data: any) => String(data.shift || data.shiftName || "").trim())
+              .filter((sh: string): sh is string => sh.length > 0)
           )
         ).sort();
 
         setPoolSize(snap.size);
         setAvailableSubjects(subjects);
-        setSelectedSubject((currentSubject) =>
-          currentSubject === "All Subjects" || subjects.includes(currentSubject)
-            ? currentSubject
-            : "All Subjects"
-        );
+        setAvailableYears(years);
+        setAvailableShifts(shifts);
+
         setPhase("intro");
       } catch (err) {
         console.error(err);
@@ -265,7 +291,7 @@ export default function PYQPage() {
     checkPool();
   }, [targetExam]);
 
-  // STEP 2 — PULL A RANDOM MIX OF QUESTIONS ACROSS ALL SUBJECTS
+  // STEP 2 — START TEST WITH ACTIVE FILTERS
   const startPYQSet = async () => {
     try {
       setPhase("loading");
@@ -275,20 +301,9 @@ export default function PYQPage() {
       setCurrent(0);
       setTimeLeft(TIMER_SECONDS);
 
-      const examFilters = normalizeTargetExam(targetExam);
-
-      const snap = await getDocs(
-        query(
-          collection(db, "questions"),
-          where("exam", "in", examFilters),
-          limit(FETCH_POOL_LIMIT)
-        )
-      );
-
       let arr: Question[] = [];
 
-      snap.forEach((d) => {
-        const data: any = d.data();
+      rawDocsData.forEach((data: any) => {
         const optionMap: Record<string, string> = {
           A: String(data.optionA ?? "").trim(),
           B: String(data.optionB ?? "").trim(),
@@ -304,8 +319,21 @@ export default function PYQPage() {
 
         if (!primaryText || !allOptionsPresent || !answerValue) return;
 
+        // Filter by Subject
         const subject = String(data.subject || data.topic || "").trim();
         if (selectedSubject !== "All Subjects" && subject !== selectedSubject) {
+          return;
+        }
+
+        // Filter by Year
+        const questionYear = String(data.year || "").trim();
+        if (selectedYear !== "All Years" && questionYear && questionYear !== selectedYear) {
+          return;
+        }
+
+        // Filter by Shift
+        const questionShift = String(data.shift || data.shiftName || "").trim();
+        if (selectedShift !== "All Shifts" && questionShift && questionShift !== selectedShift) {
           return;
         }
 
@@ -326,7 +354,7 @@ export default function PYQPage() {
         );
 
         arr.push({
-          id: d.id,
+          id: data.id,
           question: primaryText,
           questionEn: primaryText,
           questionHi: data.questionHi || data.questionHindi || "",
@@ -336,17 +364,15 @@ export default function PYQPage() {
           answer: newCorrectText,
           examName: data.exam || targetExam,
           topic: subject || targetExam,
+          year: data.year,
+          shift: data.shift,
         });
       });
 
       arr = fisherYatesShuffle(arr).slice(0, TOTAL_QUESTIONS);
 
       if (arr.length === 0) {
-        setError(
-          selectedSubject === "All Subjects"
-            ? `No verified questions found for ${targetExam}.`
-            : `No verified ${selectedSubject} questions found for ${targetExam}.`
-        );
+        setError("No questions matched the selected filters. Please try 'All Years' or 'All Subjects'.");
         setPhase("result");
         return;
       }
@@ -415,7 +441,8 @@ export default function PYQPage() {
         score: finalScore,
         total: questions.length,
         examTrack: targetExam,
-        subject: "PYQ Mixed",
+        subject: selectedSubject,
+        year: selectedYear,
         mode: "pyq",
         createdAt: serverTimestamp(),
       });
@@ -469,7 +496,7 @@ export default function PYQPage() {
     );
   }
 
-  // 🔒 LOCKED SCREEN UI
+  // LOCKED SCREEN UI
   if (phase === "locked") {
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
@@ -499,7 +526,7 @@ export default function PYQPage() {
     );
   }
 
-  // INTRO SCREEN
+  // INTRO SCREEN WITH YEAR & SHIFT FILTER
   if (phase === "intro") {
     return (
       <div className="min-h-screen bg-slate-50/50 pb-32">
@@ -522,32 +549,81 @@ export default function PYQPage() {
           </div>
         </header>
 
-        <div className="max-w-2xl mx-auto px-4 mt-8">
+        <div className="max-w-2xl mx-auto px-4 mt-6">
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm text-center">
             <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <ScrollText size={26} />
             </div>
-            <h2 className="text-xl font-black text-slate-900 mb-2">PYQ Practice Set</h2>
-            <p className="text-slate-500 text-sm leading-relaxed mb-1">
-              {TOTAL_QUESTIONS} random questions for {targetExam}, selected from the subject below.
+            <h2 className="text-xl font-black text-slate-900 mb-1">Authentic Exam PYQ Papers</h2>
+            <p className="text-slate-500 text-xs sm:text-sm leading-relaxed mb-1">
+              Select Year, Shift and Subject to practice exactly like the real examination.
             </p>
-            <p className="text-slate-400 text-xs mb-6">
-              {poolSize}+ questions in the bank • fresh random set every attempt
+            <p className="text-slate-400 text-[11px] mb-6 font-medium">
+              {poolSize}+ verified questions • 30 Questions • 30 Minutes Timer
             </p>
 
+            {/* 1. YEAR SELECTOR (Testbook Style) */}
+            {availableYears.length > 0 && (
+              <div className="text-left mb-5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+                  <Calendar size={12} className="text-indigo-600" /> Select Exam Year
+                </label>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {["All Years", ...availableYears].map((yr) => (
+                    <button
+                      key={yr}
+                      type="button"
+                      onClick={() => setSelectedYear(yr)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${selectedYear === yr
+                          ? "bg-slate-900 border-slate-900 text-white shadow-sm"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                    >
+                      {yr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 2. SHIFT SELECTOR */}
+            {availableShifts.length > 0 && (
+              <div className="text-left mb-5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+                  <Layers size={12} className="text-indigo-600" /> Select Shift / Paper
+                </label>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {["All Shifts", ...availableShifts].map((sh) => (
+                    <button
+                      key={sh}
+                      type="button"
+                      onClick={() => setSelectedShift(sh)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${selectedShift === sh
+                          ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                    >
+                      {sh}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 3. SUBJECT SELECTOR */}
             <div className="text-left mb-6">
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
                 Choose Subject
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {["All Subjects", ...availableSubjects].map((subject) => (
                   <button
                     key={subject}
                     type="button"
                     onClick={() => setSelectedSubject(subject)}
-                    className={`min-h-10 rounded-xl border px-3 py-2 text-xs font-bold transition-all ${selectedSubject === subject
-                      ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50"
+                    className={`min-h-10 rounded-xl border px-3 py-2 text-xs font-bold transition-all text-center ${selectedSubject === subject
+                        ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50"
                       }`}
                   >
                     {subject}
@@ -558,9 +634,9 @@ export default function PYQPage() {
 
             <button
               onClick={startPYQSet}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98"
             >
-              <ScrollText size={16} /> Start PYQ Set
+              <ScrollText size={16} /> Start Real PYQ Test
             </button>
           </div>
         </div>
@@ -614,7 +690,7 @@ export default function PYQPage() {
             PYQ Set Complete
           </h1>
           <p className="text-slate-400 mt-1 text-xs font-medium">
-            Mixed-subject performance for <span className="font-bold text-slate-700">{targetExam}</span> recorded.
+            Performance for <span className="font-bold text-slate-700">{targetExam}</span> ({selectedYear}) recorded.
           </p>
 
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mt-6 flex items-center justify-between">
@@ -663,7 +739,7 @@ export default function PYQPage() {
 
             <div>
               <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block">
-                {q.topic || "PYQ"}
+                {q.topic || "PYQ"} {q.year ? `• ${q.year}` : ""}
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
@@ -696,7 +772,7 @@ export default function PYQPage() {
                 Question {current + 1} of {questions.length}
               </span>
               <span className="inline-block mt-1 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-md text-[10px] font-black px-2 py-0.5 uppercase tracking-wide">
-                {q.topic}
+                {q.topic} {q.shift ? `• ${q.shift}` : ""}
               </span>
             </div>
             <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
@@ -728,14 +804,14 @@ export default function PYQPage() {
                   key={i}
                   onClick={() => selectAnswer(optEn)}
                   className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center gap-4 group ${isSelected
-                    ? "border-indigo-600 bg-indigo-50/60 shadow-sm shadow-indigo-600/5 text-indigo-900"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
+                      ? "border-indigo-600 bg-indigo-50/60 shadow-sm shadow-indigo-600/5 text-indigo-900"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
                     }`}
                 >
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isSelected
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
                       }`}
                   >
                     {String.fromCharCode(65 + i)}
@@ -768,8 +844,8 @@ export default function PYQPage() {
               onClick={nextQuestion}
               disabled={!answers[current]}
               className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${answers[current]
-                ? "bg-slate-900 hover:bg-slate-800 text-white"
-                : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                  ? "bg-slate-900 hover:bg-slate-800 text-white"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                 }`}
             >
               {current === questions.length - 1 ? (
@@ -778,7 +854,7 @@ export default function PYQPage() {
                 </>
               ) : (
                 <>
-                  Next <ArrowRight size={13} />
+                  <NextIcon size={13} /> Next <ArrowRight size={13} />
                 </>
               )}
             </button>
@@ -798,10 +874,10 @@ export default function PYQPage() {
                   key={i}
                   onClick={() => setCurrent(i)}
                   className={`h-9 rounded-lg font-bold text-xs transition-all border ${isCurrent
-                    ? "bg-indigo-600 border-indigo-600 text-white shadow-sm ring-2 ring-indigo-100"
-                    : isAnswered
-                      ? "bg-indigo-50 border-indigo-200 text-indigo-600 font-black"
-                      : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
+                      ? "bg-indigo-600 border-indigo-600 text-white shadow-sm ring-2 ring-indigo-100"
+                      : isAnswered
+                        ? "bg-indigo-50 border-indigo-200 text-indigo-600 font-black"
+                        : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
                     }`}
                 >
                   {i + 1}
@@ -813,4 +889,8 @@ export default function PYQPage() {
       </main>
     </div>
   );
+}
+
+function NextIcon({ size }: { size: number }) {
+  return null;
 }
