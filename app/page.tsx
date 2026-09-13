@@ -6,12 +6,43 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
 import { checkTrialStatus } from "@/lib/trial-check";
-import { Flame, Trophy, Target, Crown, Rocket, Zap, ArrowUpRight, ShieldCheck, ScrollText, Newspaper, X, Instagram, Facebook, Youtube, Linkedin, Heart } from "lucide-react";
+import {
+  Flame,
+  Trophy,
+  Target,
+  Crown,
+  Rocket,
+  Zap,
+  ArrowUpRight,
+  ShieldCheck,
+  ScrollText,
+  Newspaper,
+  X,
+  Instagram,
+  Facebook,
+  Youtube,
+  Linkedin,
+  Heart,
+  History,
+  CheckCircle2,
+  Calendar,
+  ChevronRight
+} from "lucide-react";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import UpdatePwaBanner from "@/components/UpdatePwaBanner";
+
+interface TestAttempt {
+  id: string;
+  examTrack?: string;
+  subject?: string;
+  score: number;
+  total: number;
+  createdAt?: any;
+  mode?: string;
+}
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("Student");
@@ -20,6 +51,15 @@ export default function Dashboard() {
   const [userData, setUserData] = useState<any>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
+
+  // 🎯 Test History & Metrics States (Testbook-style tracking)
+  const [totalTests, setTotalTests] = useState(0);
+  const [totalQuestionsAttempted, setTotalQuestionsAttempted] = useState(0);
+  const [avgAccuracy, setAvgAccuracy] = useState(0);
+  const [recentAttempts, setRecentAttempts] = useState<TestAttempt[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -40,8 +80,78 @@ export default function Dashboard() {
       } else {
         setUserName(currentUser.displayName || "Student");
       }
+
+      // 📊 Fetch User's Real Exam Results History
+      await fetchUserTestHistory(currentUser.uid);
     } catch (error) {
       console.error("Error fetching user data:", error);
+    }
+  };
+
+  const fetchUserTestHistory = async (uid: string) => {
+    try {
+      setLoadingHistory(true);
+      const resultsRef = collection(db, "exam_results");
+
+      // Pull recent attempts for this student
+      const q = query(
+        resultsRef,
+        where("userId", "==", uid),
+        limit(50)
+      );
+
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        let totalScoreSum = 0;
+        let totalQuestionsSum = 0;
+        const attemptsList: TestAttempt[] = [];
+
+        snap.docs.forEach((d) => {
+          const item = d.data();
+          const score = Number(item.score || 0);
+          const total = Number(item.total || 0);
+          totalScoreSum += score;
+          totalQuestionsSum += total;
+
+          attemptsList.push({
+            id: d.id,
+            examTrack: item.examTrack || item.subject || "Practice Set",
+            subject: item.subject || "Mixed",
+            score: score,
+            total: total > 0 ? total : 30,
+            createdAt: item.createdAt,
+            mode: item.mode || "Test",
+          });
+        });
+
+        // Sort descending by date if timestamp exists
+        attemptsList.sort((a, b) => {
+          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+          return timeB - timeA;
+        });
+
+        setTotalTests(snap.size);
+        setTotalQuestionsAttempted(totalQuestionsSum);
+        setRecentAttempts(attemptsList);
+
+        if (totalQuestionsSum > 0) {
+          const acc = Math.round((totalScoreSum / totalQuestionsSum) * 100);
+          setAvgAccuracy(acc);
+        } else {
+          setAvgAccuracy(0);
+        }
+      } else {
+        setTotalTests(0);
+        setTotalQuestionsAttempted(0);
+        setAvgAccuracy(0);
+        setRecentAttempts([]);
+      }
+    } catch (err) {
+      console.error("Error reading exam_results history:", err);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -114,6 +224,113 @@ export default function Dashboard() {
               className="w-full mt-6 bg-slate-900 text-white h-12 rounded-xl font-bold text-sm"
             >
               Let's Go 🚀
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🎯 TESTBOOK STYLE TEST HISTORY MODAL */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-[90] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl relative max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <History size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    My Test History & Attempts
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Verified records of all attempted tests
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Quick Stats inside modal */}
+            <div className="grid grid-cols-3 gap-2 py-4 border-b border-slate-100">
+              <div className="bg-slate-50 rounded-xl p-3 text-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Sets</span>
+                <span className="text-lg font-black text-slate-900">{totalTests}</span>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Questions</span>
+                <span className="text-lg font-black text-indigo-600">{totalQuestionsAttempted}</span>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Accuracy</span>
+                <span className="text-lg font-black text-emerald-600">{avgAccuracy}%</span>
+              </div>
+            </div>
+
+            {/* Attempts Scroll List */}
+            <div className="flex-1 overflow-y-auto py-3 space-y-2.5 pr-1">
+              {recentAttempts.length === 0 ? (
+                <div className="text-center py-10">
+                  <ScrollText size={36} className="mx-auto text-slate-300 mb-2" />
+                  <p className="text-sm font-bold text-slate-700">No test attempts yet!</p>
+                  <p className="text-xs text-slate-400 mt-1">Start with Daily Challenge or PYQ practice to record history.</p>
+                </div>
+              ) : (
+                recentAttempts.map((att, idx) => {
+                  const dateStr = att.createdAt?.toDate
+                    ? att.createdAt.toDate().toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                    : "Recent Test";
+
+                  const percentage = att.total > 0 ? Math.round((att.score / att.total) * 100) : 0;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-slate-200 text-indigo-600">
+                            {att.mode || "Test"}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">{dateStr}</span>
+                        </div>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 mt-1 truncate">
+                          {att.examTrack}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Subject: {att.subject}
+                        </p>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-sm sm:text-base font-black text-indigo-600">
+                          {att.score} <span className="text-slate-400 text-xs font-bold">/ {att.total}</span>
+                        </div>
+                        <span className={`text-[10px] font-bold ${percentage >= 60 ? "text-emerald-600" : "text-amber-600"}`}>
+                          {percentage}% Correct
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowHistoryModal(false)}
+              className="w-full mt-3 bg-slate-900 hover:bg-slate-800 text-white font-bold h-11 rounded-xl text-xs uppercase tracking-wider transition"
+            >
+              Close History
             </button>
           </div>
         </div>
@@ -236,13 +453,33 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ENTERPRISE METRICS SECTION */}
+        {/* 📊 REAL TIME USER PERFORMANCE METRICS (TESTBOOK STYLE LIVE COUNTERS) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           {[
-            { label: "Daily Target", val: "Ready", desc: "Roz nayi jeet ki taiyari", color: "text-blue-600" },
-            { label: "Core Focus", val: "100% Active", desc: "Exam-oriented practice", color: "text-indigo-600" },
-            { label: "Speed Test", val: "Lightning", desc: "Beat your own timer", color: "text-amber-600" },
-            { label: "Your Rank", val: "Unleash", desc: "Climb to the top", color: "text-emerald-600" }
+            {
+              label: "Sets Attempted",
+              val: `${totalTests} Tests`,
+              desc: "Total completed sets",
+              color: "text-blue-600"
+            },
+            {
+              label: "Questions Solved",
+              val: `${totalQuestionsAttempted} Qs`,
+              desc: "Attempted questions",
+              color: "text-indigo-600"
+            },
+            {
+              label: "Avg Accuracy",
+              val: `${avgAccuracy}%`,
+              desc: "Success conversion",
+              color: "text-emerald-600"
+            },
+            {
+              label: "Target Exam",
+              val: targetExam !== "Not Set" ? targetExam : "Active",
+              desc: "Current focal track",
+              color: "text-amber-600"
+            }
           ].map((item, idx) => (
             <div key={idx} className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm">
               <p className="text-[9px] sm:text-[11px] text-slate-500 font-bold uppercase tracking-wider truncate">{item.label}</p>
@@ -254,6 +491,29 @@ export default function Dashboard() {
 
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
+
+          {/* 🌟 NEW: MY TEST HISTORY & ATTEMPTS CARD */}
+          <button
+            onClick={() => setShowHistoryModal(true)}
+            className="group relative bg-white border border-indigo-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
+          >
+            <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
+              <div className="bg-indigo-50 text-indigo-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                <History size={20} className="sm:w-6 sm:h-6" />
+              </div>
+              <div className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                <span>{totalTests} Tests Done</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                My Test History
+              </h3>
+              <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
+                Kitne set maare hain, kitna score aaya aur test analysis yahan dekho.
+              </p>
+            </div>
+          </button>
 
           {/* DAILY CHALLENGE CARD */}
           <button
@@ -319,7 +579,7 @@ export default function Dashboard() {
                 PYQ Practice
               </h3>
               <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-              Har attempt mein naye PYQs — real exam pattern par daily practice
+                Har attempt mein naye PYQs — real exam pattern par daily practice
               </p>
             </div>
           </button>
@@ -409,7 +669,7 @@ export default function Dashboard() {
                 SoniLearn Educational Platform
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 leading-relaxed">
-                  Helping students across India with daily practice questions, fast revision, and live results.
+                Helping students across India with daily practice questions, fast revision, and live results.
               </p>
             </div>
 
