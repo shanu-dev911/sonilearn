@@ -114,15 +114,34 @@ export default function WeakPage() {
         const optsEn = data.optionsEn || data.options || [];
         const optsHi = data.optionsHi || data.optionsHindi || [];
 
+        const correctAns = data.correctAnswer || data.answer || "";
+
+        // 🔍 Multi-key fallback to never lose explanations
+        const expEn =
+          data.explanationEn ||
+          data.explanation ||
+          data.solution ||
+          data.solutionEn ||
+          data.desc ||
+          data.ansDescription ||
+          "";
+
+        const expHi =
+          data.explanationHi ||
+          data.explanationHindi ||
+          data.solutionHi ||
+          data.solutionHindi ||
+          "";
+
         arr.push({
           id: d.id,
           questionEn: qEn,
           questionHi: qHi,
           optionsEn: optsEn,
           optionsHi: optsHi,
-          correctAnswer: data.correctAnswer || data.answer || "",
-          explanationEn: data.explanationEn || data.explanation || "",
-          explanationHi: data.explanationHi || data.explanationHindi || "",
+          correctAnswer: correctAns,
+          explanationEn: expEn,
+          explanationHi: expHi,
           topic: data.topic || "General Assessment",
         });
       });
@@ -291,7 +310,7 @@ export default function WeakPage() {
           </div>
 
           <button
-            onClick={() => router.push("/daily")}
+            onClick={() => router.push("/")}
             className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-sm transition-all"
           >
             Back to Dashboard
@@ -395,19 +414,19 @@ export default function WeakPage() {
                   onClick={() => selectAnswer(optionEn)}
                   disabled={status === "correct"}
                   className={`w-full text-left rounded-xl border p-4 transition-all duration-200 flex items-center justify-between group ${isCorrect && status !== "idle"
-                    ? "border-emerald-600 bg-emerald-50/60 text-emerald-900 shadow-sm"
-                    : isSelected && status === "wrong"
-                      ? "border-rose-500 bg-rose-50/60 text-rose-900"
-                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
+                      ? "border-emerald-600 bg-emerald-50/60 text-emerald-900 shadow-sm"
+                      : isSelected && status === "wrong"
+                        ? "border-rose-500 bg-rose-50/60 text-rose-900"
+                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40 text-slate-800"
                     }`}
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div
                       className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs transition-all flex-shrink-0 ${isCorrect && status !== "idle"
-                        ? "bg-emerald-600 text-white"
-                        : isSelected && status === "wrong"
-                          ? "bg-rose-500 text-white"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-emerald-600 text-white"
+                          : isSelected && status === "wrong"
+                            ? "bg-rose-500 text-white"
+                            : "bg-slate-100 text-slate-500"
                         }`}
                     >
                       {String.fromCharCode(65 + index)}
@@ -442,28 +461,40 @@ export default function WeakPage() {
             })}
           </div>
 
+          {/* 🎯 EXPLANATION SECTION (NEVER DISAPPEARS) */}
           {status !== "idle" && (
             <div
               className={`mt-6 rounded-2xl p-4 border text-xs leading-relaxed ${status === "correct"
-                ? "bg-blue-50/60 border-blue-100 text-blue-900"
-                : "bg-amber-50/60 border-amber-100 text-amber-900"
+                  ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
+                  : "bg-amber-50/70 border-amber-200 text-amber-950"
                 }`}
             >
-              <div className="flex items-center gap-1.5 font-black uppercase tracking-wider text-[10px] text-slate-400 mb-2">
-                <BookOpen size={12} /> Explanation
+              <div className="flex items-center gap-1.5 font-black uppercase tracking-wider text-[10px] text-slate-500 mb-2">
+                <BookOpen size={13} className="text-indigo-600" /> Explanation & Solution
               </div>
 
+              {/* Show text explanation if present */}
               {q.explanationEn && (
-                <p className="font-bold text-slate-700 block mb-1.5">
+                <p className="font-semibold text-slate-800 block mb-1.5 leading-relaxed">
                   {q.explanationEn}
                 </p>
               )}
 
               {q.explanationHi && (
-                <p className="font-medium text-slate-600 block border-t border-slate-200/40 pt-1.5 font-hindi">
+                <p className="font-medium text-slate-700 block border-t border-slate-200/60 pt-1.5 font-hindi leading-relaxed">
                   {q.explanationHi}
                 </p>
               )}
+
+              {/* Verified Answer Highlight */}
+              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Correct Answer:
+                </span>
+                <span className="font-black text-emerald-700 text-xs bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                  {q.correctAnswer}
+                </span>
+              </div>
             </div>
           )}
 
@@ -471,20 +502,20 @@ export default function WeakPage() {
             {status === "correct" ? (
               <button
                 onClick={handleMastered}
-                className="w-full bg-emerald-900 hover:bg-emerald-800 text-white h-12 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5"
+                className="w-full bg-emerald-900 hover:bg-emerald-800 text-white h-12 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all"
               >
                 <CheckCircle2 size={14} /> Mark as Mastered
               </button>
             ) : status === "wrong" ? (
               <button
                 onClick={resetQuestion}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all"
               >
                 <RotateCcw size={14} /> Try Again
               </button>
             ) : (
               <div className="text-center text-xs text-slate-400 font-bold uppercase tracking-wider py-2">
-                Select an option to check your answer
+                Select an option to check your answer & view solution
               </div>
             )}
           </div>

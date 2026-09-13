@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
 import { checkTrialStatus } from "@/lib/trial-check";
 import {
@@ -17,7 +17,6 @@ import {
   Rocket,
   Zap,
   ArrowUpRight,
-  ShieldCheck,
   ScrollText,
   Newspaper,
   X,
@@ -28,8 +27,7 @@ import {
   Heart,
   History,
   CheckCircle2,
-  Calendar,
-  ChevronRight
+  XCircle
 } from "lucide-react";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import UpdatePwaBanner from "@/components/UpdatePwaBanner";
@@ -52,13 +50,12 @@ export default function Dashboard() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
-  // 🎯 Test History & Metrics States (Testbook-style tracking)
+  // 🎯 Test History & Metrics States
   const [totalTests, setTotalTests] = useState(0);
   const [totalQuestionsAttempted, setTotalQuestionsAttempted] = useState(0);
   const [avgAccuracy, setAvgAccuracy] = useState(0);
   const [recentAttempts, setRecentAttempts] = useState<TestAttempt[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,7 +78,6 @@ export default function Dashboard() {
         setUserName(currentUser.displayName || "Student");
       }
 
-      // 📊 Fetch User's Real Exam Results History
       await fetchUserTestHistory(currentUser.uid);
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -90,10 +86,7 @@ export default function Dashboard() {
 
   const fetchUserTestHistory = async (uid: string) => {
     try {
-      setLoadingHistory(true);
       const resultsRef = collection(db, "exam_results");
-
-      // Pull recent attempts for this student
       const q = query(
         resultsRef,
         where("userId", "==", uid),
@@ -125,7 +118,6 @@ export default function Dashboard() {
           });
         });
 
-        // Sort descending by date if timestamp exists
         attemptsList.sort((a, b) => {
           const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
           const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
@@ -150,8 +142,6 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error("Error reading exam_results history:", err);
-    } finally {
-      setLoadingHistory(false);
     }
   };
 
@@ -168,7 +158,6 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [router]);
 
-  // 🎯 Show welcome celebration if just came back from successful payment
   useEffect(() => {
     if (searchParams.get("upgraded") === "true") {
       setShowWelcome(true);
@@ -181,7 +170,6 @@ export default function Dashboard() {
       };
 
       refreshPremiumState();
-      // Clean the URL so refresh doesn't re-trigger it
       window.history.replaceState({}, "", "/");
 
       const timer = setTimeout(() => setShowWelcome(false), 6000);
@@ -202,7 +190,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans selection:bg-blue-600 selection:text-white">
 
-      {/* 🎯 PREMIUM WELCOME CELEBRATION OVERLAY */}
+      {/* 🎯 PREMIUM WELCOME OVERLAY */}
       {showWelcome && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative animate-in fade-in zoom-in duration-300">
@@ -217,7 +205,7 @@ export default function Dashboard() {
             </div>
             <h2 className="text-2xl font-black text-slate-900 mb-2">Welcome to Premium! 🎉</h2>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Payment successful! You now have full access to every feature — Warrior Questions, unlimited Daily Challenge, Leaderboard, and more.
+              Payment successful! You now have full access to every feature.
             </p>
             <button
               onClick={() => setShowWelcome(false)}
@@ -271,13 +259,13 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Attempts Scroll List */}
+            {/* Attempts Scroll List with Wrong Answer Calculation */}
             <div className="flex-1 overflow-y-auto py-3 space-y-2.5 pr-1">
               {recentAttempts.length === 0 ? (
                 <div className="text-center py-10">
                   <ScrollText size={36} className="mx-auto text-slate-300 mb-2" />
                   <p className="text-sm font-bold text-slate-700">No test attempts yet!</p>
-                  <p className="text-xs text-slate-400 mt-1">Start with Daily Challenge or PYQ practice to record history.</p>
+                  <p className="text-xs text-slate-400 mt-1">Start practicing to track your attempts.</p>
                 </div>
               ) : (
                 recentAttempts.map((att, idx) => {
@@ -290,7 +278,8 @@ export default function Dashboard() {
                     })
                     : "Recent Test";
 
-                  const percentage = att.total > 0 ? Math.round((att.score / att.total) * 100) : 0;
+                  const correctAnswers = att.score;
+                  const wrongAnswers = Math.max(0, att.total - att.score);
 
                   return (
                     <div
@@ -313,12 +302,17 @@ export default function Dashboard() {
                       </div>
 
                       <div className="text-right flex-shrink-0">
-                        <div className="text-sm sm:text-base font-black text-indigo-600">
+                        <div className="text-sm sm:text-base font-black text-slate-800">
                           {att.score} <span className="text-slate-400 text-xs font-bold">/ {att.total}</span>
                         </div>
-                        <span className={`text-[10px] font-bold ${percentage >= 60 ? "text-emerald-600" : "text-amber-600"}`}>
-                          {percentage}% Correct
-                        </span>
+                        <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                            <CheckCircle2 size={10} /> {correctAnswers}
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                            <XCircle size={10} /> {wrongAnswers}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -340,7 +334,6 @@ export default function Dashboard() {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-2">
-            {/* BRAND LOGO */}
             <div className="flex items-center gap-2 max-w-[45%] sm:max-w-none">
               <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
                 <Image
@@ -362,9 +355,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* ACTION PIPELINE */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* 🎯 DYNAMIC MEMBERSHIP BADGE */}
               <div
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm whitespace-nowrap ${isPremium
                   ? "bg-gradient-to-r from-amber-400 to-amber-500 text-white border border-amber-300"
@@ -399,7 +390,7 @@ export default function Dashboard() {
       {/* CONTAINER CONTROL */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
 
-        {/* 🎯 TRIAL BANNER */}
+        {/* TRIAL BANNERS */}
         {!isPremium && trialStatus && trialStatus.isTrialActive && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
             <p className="text-blue-700 text-xs sm:text-sm font-bold">
@@ -414,7 +405,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 🎯 TRIAL EXPIRED BANNER */}
         {!isPremium && trialStatus && !trialStatus.isTrialActive && (
           <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
             <p className="text-rose-700 text-xs sm:text-sm font-bold">
@@ -429,7 +419,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* PREMIUM MINIMALIST BANNER */}
+        {/* HERO BANNER */}
         <div className="relative overflow-hidden bg-slate-900 text-white rounded-[1.5rem] sm:rounded-[1.75rem] p-5 sm:p-8 md:p-10 shadow-xl border border-slate-800 mb-6 sm:mb-8">
           <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/40 via-transparent to-indigo-900/30 pointer-events-none" />
           <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5 sm:gap-6">
@@ -453,7 +443,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 📊 REAL TIME USER PERFORMANCE METRICS (TESTBOOK STYLE LIVE COUNTERS) */}
+        {/* METRICS SECTION */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           {[
             {
@@ -492,30 +482,7 @@ export default function Dashboard() {
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
 
-          {/* 🌟 NEW: MY TEST HISTORY & ATTEMPTS CARD */}
-          <button
-            onClick={() => setShowHistoryModal(true)}
-            className="group relative bg-white border border-indigo-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
-          >
-            <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
-              <div className="bg-indigo-50 text-indigo-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                <History size={20} className="sm:w-6 sm:h-6" />
-              </div>
-              <div className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                <span>{totalTests} Tests Done</span>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-                My Test History
-              </h3>
-              <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
-                Kitne set maare hain, kitna score aaya aur test analysis yahan dekho.
-              </p>
-            </div>
-          </button>
-
-          {/* DAILY CHALLENGE CARD */}
+          {/* 1. DAILY CHALLENGE CARD */}
           <button
             onClick={() => router.push("/daily")}
             className="group relative bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
@@ -538,7 +505,7 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* WEAK PRACTICE CARD */}
+          {/* 2. WEAK PRACTICE CARD */}
           <button
             onClick={() => router.push("/weak")}
             className="group relative bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
@@ -561,10 +528,10 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* PYQ PRACTICE CARD */}
+          {/* 3. PYQ PRACTICE CARD */}
           <button
             onClick={() => router.push("/pyq")}
-            className="group relative bg-white border border-slate-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
+            className="group relative bg-white border border-indigo-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
           >
             <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
               <div className="bg-indigo-50 text-indigo-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
@@ -584,7 +551,7 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* CURRENT AFFAIRS CARD */}
+          {/* 4. CURRENT AFFAIRS CARD */}
           <button
             onClick={() => router.push("/current-affairs")}
             className="group relative bg-white border border-slate-200 hover:border-emerald-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
@@ -607,7 +574,30 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* LEADERBOARD CARD */}
+          {/* 5. 🎯 MY TEST HISTORY CARD (LEADERBOARD KE THEEK PEHLE) */}
+          <button
+            onClick={() => setShowHistoryModal(true)}
+            className="group relative bg-white border border-slate-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
+          >
+            <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
+              <div className="bg-indigo-50 text-indigo-600 p-2.5 sm:p-3 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                <History size={20} className="sm:w-6 sm:h-6" />
+              </div>
+              <div className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                <span>{totalTests} Tests Done</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                My Test History
+              </h3>
+              <p className="text-slate-500 text-[11px] sm:text-xs mt-1.5 sm:mt-2 font-medium leading-relaxed">
+                Kitne set maare hain, kitna score aaya aur test analysis yahan dekho.
+              </p>
+            </div>
+          </button>
+
+          {/* 6. LEADERBOARD CARD */}
           <button
             onClick={() => router.push("/leaderboard")}
             className="group relative bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
@@ -657,10 +647,9 @@ export default function Dashboard() {
           </div>
         </button>
 
-        {/* 🌟 PROFESSIONAL FOUNDER, ABOUT & SOCIAL FOOTER */}
+        {/* FOOTER */}
         <footer className="mt-8 mb-6 bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-sm text-center">
           <div className="max-w-2xl mx-auto space-y-5">
-            {/* BRAND & FOUNDER INFO */}
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black uppercase tracking-wider mb-2.5">
                 <Heart size={11} className="text-red-500 fill-red-500" /> Made for Aspirants
@@ -673,7 +662,6 @@ export default function Dashboard() {
               </p>
             </div>
 
-            {/* FOUNDER TAG */}
             <div className="pt-2 border-t border-slate-100">
               <p className="text-xs text-slate-600 font-semibold">
                 Designed & Developed by{" "}
@@ -684,13 +672,11 @@ export default function Dashboard() {
               </p>
             </div>
 
-            {/* SOCIAL MEDIA CHANNELS */}
             <div className="pt-1">
               <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-3">
                 Connect With Us
               </span>
               <div className="flex items-center justify-center gap-3 flex-wrap">
-                {/* Instagram */}
                 <a
                   href="https://www.instagram.com/sonilearn.in/"
                   target="_blank"
@@ -701,7 +687,6 @@ export default function Dashboard() {
                   <Instagram size={18} />
                 </a>
 
-                {/* Facebook */}
                 <a
                   href="https://www.facebook.com/sonilearn.official"
                   target="_blank"
@@ -712,7 +697,6 @@ export default function Dashboard() {
                   <Facebook size={18} />
                 </a>
 
-                {/* YouTube */}
                 <a
                   href="https://www.youtube.com/@sonilearnin"
                   target="_blank"
@@ -723,7 +707,6 @@ export default function Dashboard() {
                   <Youtube size={18} />
                 </a>
 
-                {/* LinkedIn */}
                 <a
                   href="https://www.linkedin.com/in/shanu-sharma-9a4950432/"
                   target="_blank"
@@ -736,7 +719,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* COPYRIGHT NOTICE */}
             <div className="pt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
               © {new Date().getFullYear()} SoniLearn. All rights reserved.
             </div>
