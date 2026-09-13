@@ -30,7 +30,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
-import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, ScrollText, Lock, Crown, Calendar, Layers } from "lucide-react";
+import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, ScrollText, Lock, Crown, Calendar, Layers, Sparkles } from "lucide-react";
 import { checkTrialStatus } from "@/lib/trial-check";
 
 interface Question {
@@ -60,13 +60,30 @@ const TOTAL_QUESTIONS = 30;
 const TIMER_SECONDS = 30 * 60; // 30 minutes
 const FETCH_POOL_LIMIT = 500;
 
+// 🎯 COMPLETE 2016 - 2026 TIMELINE (Always Available on Screen)
+const ALL_EXAM_YEARS = [
+  "2026",
+  "2025",
+  "2024",
+  "2023",
+  "2022",
+  "2021",
+  "2020",
+  "2019",
+  "2018",
+  "2017",
+  "2016",
+];
+
+const DEFAULT_SHIFTS = ["All Shifts", "Shift 1", "Shift 2", "Shift 3"];
+
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// 🎯 Fisher-Yates shuffle with crypto randomness
+// 🎯 Crypto Random Shuffler
 function getSecureRandom(): number {
   if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
     const arr = new Uint32Array(1);
@@ -137,12 +154,12 @@ export default function PYQPage() {
   const [targetExam, setTargetExam] = useState("");
   const [poolSize, setPoolSize] = useState(0);
 
-  // Dynamic Filters
+  // Dynamic Filters (With 2016-2026 Guaranteed Display)
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("All Subjects");
-  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [availableYears, setAvailableYears] = useState<string[]>(ALL_EXAM_YEARS);
   const [selectedYear, setSelectedYear] = useState("All Years");
-  const [availableShifts, setAvailableShifts] = useState<string[]>([]);
+  const [availableShifts, setAvailableShifts] = useState<string[]>(DEFAULT_SHIFTS);
   const [selectedShift, setSelectedShift] = useState("All Shifts");
 
   const [rawDocsData, setRawDocsData] = useState<any[]>([]);
@@ -222,7 +239,7 @@ export default function PYQPage() {
     return () => unsubscribe();
   }, [user, authLoading, authError]);
 
-  // STEP 1 — PULL QUESTION POOL AND EXTRACT YEARS, SHIFTS, AND SUBJECTS
+  // STEP 1 — PULL QUESTION POOL AND MAP SUBJECTS & SHIFTS
   useEffect(() => {
     if (!targetExam) return;
 
@@ -248,7 +265,7 @@ export default function PYQPage() {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setRawDocsData(docs);
 
-        // Extract Subjects
+        // Extract Subjects from docs
         const subjects: string[] = Array.from(
           new Set<string>(
             docs
@@ -257,17 +274,21 @@ export default function PYQPage() {
           )
         ).sort();
 
-        // Extract Years (2016-2026 format)
-        const years: string[] = Array.from(
+        // Extract any DB years and merge with standard 2016-2026
+        const dbYears: string[] = Array.from(
           new Set<string>(
             docs
               .map((data: any) => String(data.year || "").trim())
               .filter((y: string): y is string => y.length > 0)
           )
-        ).sort((a, b) => Number(b) - Number(a));
+        );
 
-        // Extract Shifts
-        const shifts: string[] = Array.from(
+        const mergedYears = Array.from(new Set([...ALL_EXAM_YEARS, ...dbYears])).sort(
+          (a, b) => Number(b) - Number(a)
+        );
+
+        // Extract Shifts from docs or keep default shifts
+        const dbShifts: string[] = Array.from(
           new Set<string>(
             docs
               .map((data: any) => String(data.shift || data.shiftName || "").trim())
@@ -275,10 +296,12 @@ export default function PYQPage() {
           )
         ).sort();
 
+        const mergedShifts = Array.from(new Set(["All Shifts", ...DEFAULT_SHIFTS.slice(1), ...dbShifts]));
+
         setPoolSize(snap.size);
         setAvailableSubjects(subjects);
-        setAvailableYears(years);
-        setAvailableShifts(shifts);
+        setAvailableYears(mergedYears);
+        setAvailableShifts(mergedShifts);
 
         setPhase("intro");
       } catch (err) {
@@ -325,7 +348,7 @@ export default function PYQPage() {
           return;
         }
 
-        // Filter by Year
+        // Filter by Year (Checks exact year match if specified)
         const questionYear = String(data.year || "").trim();
         if (selectedYear !== "All Years" && questionYear && questionYear !== selectedYear) {
           return;
@@ -364,15 +387,15 @@ export default function PYQPage() {
           answer: newCorrectText,
           examName: data.exam || targetExam,
           topic: subject || targetExam,
-          year: data.year,
-          shift: data.shift,
+          year: data.year || selectedYear,
+          shift: data.shift || selectedShift,
         });
       });
 
       arr = fisherYatesShuffle(arr).slice(0, TOTAL_QUESTIONS);
 
       if (arr.length === 0) {
-        setError("No questions matched the selected filters. Please try 'All Years' or 'All Subjects'.");
+        setError(`No questions matched "${selectedYear}" with "${selectedSubject}". Try selecting "All Years" or "All Subjects".`);
         setPhase("result");
         return;
       }
@@ -443,6 +466,7 @@ export default function PYQPage() {
         examTrack: targetExam,
         subject: selectedSubject,
         year: selectedYear,
+        shift: selectedShift,
         mode: "pyq",
         createdAt: serverTimestamp(),
       });
@@ -490,7 +514,7 @@ export default function PYQPage() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
         <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
         <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
-          Assembling PYQ Set...
+          Assembling Official PYQ Papers...
         </p>
       </div>
     );
@@ -506,7 +530,7 @@ export default function PYQPage() {
           </div>
           <h1 className="text-xl font-black text-slate-900">PYQ Practice is Premium</h1>
           <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-            Your free trial has ended. Unlock unlimited PYQ Practice, Warrior Battleground, Leaderboard, and every premium feature with SoniLearn Premium.
+            Your free trial has ended. Unlock unlimited PYQ Practice, 2016-2026 Shift Papers, Warrior Battle, and Leaderboard with SoniLearn Premium.
           </p>
 
           <button
@@ -526,7 +550,7 @@ export default function PYQPage() {
     );
   }
 
-  // INTRO SCREEN WITH YEAR & SHIFT FILTER
+  // INTRO SCREEN WITH 2016-2026 TIMELINE
   if (phase === "intro") {
     return (
       <div className="min-h-screen bg-slate-50/50 pb-32">
@@ -540,7 +564,7 @@ export default function PYQPage() {
             </button>
             <div>
               <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block">
-                📜 Previous Year Questions
+                📜 Official PYQ Papers
               </span>
               <h1 className="text-sm font-black tracking-tight text-slate-800 uppercase">
                 {targetExam}
@@ -554,61 +578,66 @@ export default function PYQPage() {
             <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <ScrollText size={26} />
             </div>
-            <h2 className="text-xl font-black text-slate-900 mb-1">Authentic Exam PYQ Papers</h2>
+            <h2 className="text-xl font-black text-slate-900 mb-1">Authentic PYQ Practice</h2>
             <p className="text-slate-500 text-xs sm:text-sm leading-relaxed mb-1">
-              Select Year, Shift and Subject to practice exactly like the real examination.
+              Select Year (2016–2026), Shift and Subject to practice exactly like real exam environment.
             </p>
             <p className="text-slate-400 text-[11px] mb-6 font-medium">
-              {poolSize}+ verified questions • 30 Questions • 30 Minutes Timer
+              {poolSize}+ questions loaded • 30 Questions • 30 Minutes Timer
             </p>
 
-            {/* 1. YEAR SELECTOR (Testbook Style) */}
-            {availableYears.length > 0 && (
-              <div className="text-left mb-5">
-                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
-                  <Calendar size={12} className="text-indigo-600" /> Select Exam Year
+            {/* 1. YEAR SELECTOR (Guaranteed 2016 - 2026 Display) */}
+            <div className="text-left mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Calendar size={12} className="text-indigo-600" /> Select Exam Year (2016 - 2026)
                 </label>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                  {["All Years", ...availableYears].map((yr) => (
-                    <button
-                      key={yr}
-                      type="button"
-                      onClick={() => setSelectedYear(yr)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${selectedYear === yr
-                          ? "bg-slate-900 border-slate-900 text-white shadow-sm"
-                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
-                    >
-                      {yr}
-                    </button>
-                  ))}
-                </div>
+                {selectedYear === "2026" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <Sparkles size={10} /> Latest 2026 Papers
+                  </span>
+                )}
               </div>
-            )}
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                {["All Years", ...availableYears].map((yr) => (
+                  <button
+                    key={yr}
+                    type="button"
+                    onClick={() => setSelectedYear(yr)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${selectedYear === yr
+                        ? "bg-slate-900 border-slate-900 text-white shadow-sm ring-2 ring-slate-200"
+                        : yr === "2026"
+                          ? "bg-emerald-50/60 border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      }`}
+                  >
+                    {yr === "2026" ? "🔥 2026 (New)" : yr}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* 2. SHIFT SELECTOR */}
-            {availableShifts.length > 0 && (
-              <div className="text-left mb-5">
-                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
-                  <Layers size={12} className="text-indigo-600" /> Select Shift / Paper
-                </label>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                  {["All Shifts", ...availableShifts].map((sh) => (
-                    <button
-                      key={sh}
-                      type="button"
-                      onClick={() => setSelectedShift(sh)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${selectedShift === sh
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
-                    >
-                      {sh}
-                    </button>
-                  ))}
-                </div>
+            <div className="text-left mb-5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+                <Layers size={12} className="text-indigo-600" /> Select Shift / Paper
+              </label>
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                {availableShifts.map((sh) => (
+                  <button
+                    key={sh}
+                    type="button"
+                    onClick={() => setSelectedShift(sh)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${selectedShift === sh
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      }`}
+                  >
+                    {sh}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* 3. SUBJECT SELECTOR */}
             <div className="text-left mb-6">
@@ -636,7 +665,7 @@ export default function PYQPage() {
               onClick={startPYQSet}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98"
             >
-              <ScrollText size={16} /> Start Real PYQ Test
+              <ScrollText size={16} /> Start Real PYQ Test ({selectedYear})
             </button>
           </div>
         </div>
@@ -649,7 +678,7 @@ export default function PYQPage() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
         <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
         <p className="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
-          Saving results...
+          Saving official test results...
         </p>
       </div>
     );
@@ -663,10 +692,14 @@ export default function PYQPage() {
             <p className="text-red-500 font-bold text-sm tracking-tight">{error}</p>
             <div className="flex gap-2 mt-4 justify-center">
               <button
-                onClick={() => router.push("/")}
+                onClick={() => {
+                  setSelectedYear("All Years");
+                  setSelectedSubject("All Subjects");
+                  setPhase("intro");
+                }}
                 className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
               >
-                Go Back
+                Reset Filters
               </button>
               <button
                 onClick={() => window.location.reload()}
@@ -690,7 +723,7 @@ export default function PYQPage() {
             PYQ Set Complete
           </h1>
           <p className="text-slate-400 mt-1 text-xs font-medium">
-            Performance for <span className="font-bold text-slate-700">{targetExam}</span> ({selectedYear}) recorded.
+            Performance for <span className="font-bold text-slate-700">{targetExam}</span> ({selectedYear} • {selectedShift}) recorded.
           </p>
 
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mt-6 flex items-center justify-between">
@@ -739,7 +772,7 @@ export default function PYQPage() {
 
             <div>
               <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block">
-                {q.topic || "PYQ"} {q.year ? `• ${q.year}` : ""}
+                {q.topic || "PYQ"} • {q.year || selectedYear}
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
@@ -772,7 +805,7 @@ export default function PYQPage() {
                 Question {current + 1} of {questions.length}
               </span>
               <span className="inline-block mt-1 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-md text-[10px] font-black px-2 py-0.5 uppercase tracking-wide">
-                {q.topic} {q.shift ? `• ${q.shift}` : ""}
+                {q.topic} • {q.shift || selectedShift}
               </span>
             </div>
             <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
@@ -850,11 +883,11 @@ export default function PYQPage() {
             >
               {current === questions.length - 1 ? (
                 <>
-                  <Flag size={13} /> Submit
+                  <Flag size={13} /> Submit Test
                 </>
               ) : (
                 <>
-                  <NextIcon size={13} /> Next <ArrowRight size={13} />
+                  Next <ArrowRight size={13} />
                 </>
               )}
             </button>
@@ -889,8 +922,4 @@ export default function PYQPage() {
       </main>
     </div>
   );
-}
-
-function NextIcon({ size }: { size: number }) {
-  return null;
 }
