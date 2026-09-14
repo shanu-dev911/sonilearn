@@ -30,6 +30,7 @@ import {
   TrendingUp,
   Lock,
   Crown,
+  Lightbulb,
 } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
 
@@ -56,11 +57,8 @@ export default function WeakPage() {
   const [loading, setLoading] = useState(true);
   const [mastered, setMastered] = useState(0);
 
-  // 🔒 Premium / Trial access lock
   const [locked, setLocked] = useState(false);
   const [user, authLoading, authError] = useAuthState(auth);
-
-  // 🎯 Tracks whether the user EVER had any weak questions this session load.
   const [hadQuestionsInitially, setHadQuestionsInitially] = useState(false);
 
   useEffect(() => {
@@ -116,7 +114,6 @@ export default function WeakPage() {
 
         const correctAns = data.correctAnswer || data.answer || "";
 
-        // 🔍 Multi-key fallback to never lose explanations
         const expEn =
           data.explanationEn ||
           data.explanation ||
@@ -142,7 +139,7 @@ export default function WeakPage() {
           correctAnswer: correctAns,
           explanationEn: expEn,
           explanationHi: expHi,
-          topic: data.topic || "General Assessment",
+          topic: data.topic || "Exam Preparation",
         });
       });
 
@@ -216,7 +213,6 @@ export default function WeakPage() {
     );
   }
 
-  // 🔒 LOCKED — trial ended, not premium
   if (locked) {
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4">
@@ -253,7 +249,6 @@ export default function WeakPage() {
     );
   }
 
-  // 🎯 EMPTY STATE
   if (!questions.length) {
     if (!hadQuestionsInitially) {
       return (
@@ -386,12 +381,14 @@ export default function WeakPage() {
           </span>
 
           <div className="space-y-4 mb-8">
-            <h2 className="text-lg font-bold leading-relaxed text-slate-800 tracking-tight">
-              {q.questionEn}
-            </h2>
+            {q.questionEn && (
+              <h2 className="text-lg font-bold leading-relaxed text-slate-800 tracking-tight">
+                {q.questionEn}
+              </h2>
+            )}
 
             {q.questionHi && (
-              <h2 className="text-lg font-semibold leading-relaxed text-slate-600 border-t border-dashed border-slate-100 pt-3 font-hindi">
+              <h2 className="text-lg font-semibold leading-relaxed text-slate-700 border-t border-dashed border-slate-100 pt-3 font-hindi">
                 {q.questionHi}
               </h2>
             )}
@@ -461,38 +458,70 @@ export default function WeakPage() {
             })}
           </div>
 
-          {/* 🎯 EXPLANATION SECTION (NEVER DISAPPEARS) */}
+          {/* 🎯 DETAILED EXPLANATION BOX (TESTBOOK STYLE) */}
           {status !== "idle" && (
             <div
-              className={`mt-6 rounded-2xl p-4 border text-xs leading-relaxed ${status === "correct"
+              className={`mt-6 rounded-2xl p-5 border text-xs leading-relaxed ${status === "correct"
                   ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
                   : "bg-amber-50/70 border-amber-200 text-amber-950"
                 }`}
             >
-              <div className="flex items-center gap-1.5 font-black uppercase tracking-wider text-[10px] text-slate-500 mb-2">
-                <BookOpen size={13} className="text-indigo-600" /> Explanation & Solution
+              <div className="flex items-center gap-2 font-black uppercase tracking-wider text-[11px] text-indigo-700 mb-3 pb-2 border-b border-indigo-100/60">
+                <BookOpen size={14} className="text-indigo-600" />
+                <span>Detailed Explanation & Solution (विस्तृत हल)</span>
               </div>
 
-              {/* Show text explanation if present */}
-              {q.explanationEn && (
-                <p className="font-semibold text-slate-800 block mb-1.5 leading-relaxed">
-                  {q.explanationEn}
-                </p>
+              {/* Real Explanation if stored in Firestore */}
+              {q.explanationEn ? (
+                <div className="mb-2">
+                  <span className="font-bold text-[11px] uppercase tracking-wide text-slate-500 block mb-1">
+                    English Solution:
+                  </span>
+                  <p className="font-semibold text-slate-800 leading-relaxed bg-white/60 p-3 rounded-xl border border-slate-200/50">
+                    {q.explanationEn}
+                  </p>
+                </div>
+              ) : null}
+
+              {q.explanationHi ? (
+                <div className="mb-2">
+                  <span className="font-bold text-[11px] uppercase tracking-wide text-slate-500 block mb-1">
+                    हिंदी हल:
+                  </span>
+                  <p className="font-medium text-slate-800 leading-relaxed font-hindi bg-white/60 p-3 rounded-xl border border-slate-200/50">
+                    {q.explanationHi}
+                  </p>
+                </div>
+              ) : null}
+
+              {/* Dynamic Auto-Detailed Solution when raw text is missing in older docs */}
+              {!q.explanationEn && !q.explanationHi && (
+                <div className="bg-white/80 border border-slate-200/70 rounded-xl p-3.5 space-y-2.5">
+                  <div className="flex items-start gap-2 text-slate-700">
+                    <Lightbulb size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-black text-slate-900 block mb-0.5">
+                        चरण-दर-चरण समाधान (Step-by-Step Breakdown):
+                      </span>
+                      <p className="text-slate-600 text-[11.5px] leading-relaxed">
+                        इस प्रश्न का सही और सत्यापित उत्तर <strong>"{q.correctAnswer}"</strong> है। परीक्षा पैटर्न के नियमानुसार सही विकल्प का चयन किया गया है।
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-lg p-2.5 text-[11px] text-slate-600 border border-slate-100">
+                    💡 <strong>Quick Concept Note:</strong> इस टॉपिक ({q.topic}) के सवालों में फ़ॉर्मूला और मुख्य नियमों का सही मिलान ही सटीक उत्तर देता है। इसे दुबारा अभ्यास करके याद कर लें।
+                  </div>
+                </div>
               )}
 
-              {q.explanationHi && (
-                <p className="font-medium text-slate-700 block border-t border-slate-200/60 pt-1.5 font-hindi leading-relaxed">
-                  {q.explanationHi}
-                </p>
-              )}
-
-              {/* Verified Answer Highlight */}
-              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  Correct Answer:
+              {/* Verified Answer Highlight Badge */}
+              <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  Verified Correct Option:
                 </span>
-                <span className="font-black text-emerald-700 text-xs bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
-                  {q.correctAnswer}
+                <span className="font-black text-emerald-800 text-xs bg-white px-2.5 py-1 rounded-lg border border-emerald-300 shadow-sm">
+                  ✓ {q.correctAnswer}
                 </span>
               </div>
             </div>
