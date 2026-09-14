@@ -7,7 +7,32 @@ import { auth, db } from "@/lib/firebase-client";
 import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, User, Mail, ShieldCheck, Target, LogOut, Check, Edit2, BookmarkCheck, MessageSquare, Send, Layers } from "lucide-react";
+import {
+    ArrowLeft,
+    User,
+    Mail,
+    ShieldCheck,
+    Target,
+    LogOut,
+    Check,
+    Edit2,
+    BookmarkCheck,
+    MessageSquare,
+    Send,
+    Layers,
+    Gift,
+    Share2,
+    Copy,
+    Users,
+    Sparkles,
+    MessageCircle,
+    Smartphone,
+    X,
+    ChevronRight,
+    HelpCircle,
+    CalendarCheck,
+    CheckCircle2
+} from "lucide-react";
 
 const examsData = [
     "SSC CGL", "SSC CHSL", "SSC MTS", "SSC GD", "SSC CPO", "SSC Stenographer", "SSC JE",
@@ -63,6 +88,12 @@ const MULTI_STAGE_EXAMS: Record<string, StageConfigEntry> = {
     },
 };
 
+function generateReferralCode(name: string): string {
+    const cleanName = (name || "SL").replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 3) || "SL";
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `${cleanName}${randomNum}`;
+}
+
 export default function ProfilePage() {
     const router = useRouter();
 
@@ -72,6 +103,10 @@ export default function ProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [targetExam, setTargetExam] = useState("");
     const [examStage, setExamStage] = useState("");
+
+    // 🎁 Referral States
+    const [showReferralModal, setShowReferralModal] = useState(false);
+    const [copiedReferral, setCopiedReferral] = useState(false);
 
     const [feedbackText, setFeedbackText] = useState("");
     const [feedbackSending, setFeedbackSending] = useState(false);
@@ -90,6 +125,13 @@ export default function ProfilePage() {
 
                     if (userSnap.exists()) {
                         const data = userSnap.data();
+
+                        if (!data.referralCode) {
+                            const newCode = generateReferralCode(data.name || currentUser.displayName || "SL");
+                            await updateDoc(userRef, { referralCode: newCode });
+                            data.referralCode = newCode;
+                        }
+
                         setUserData(data);
                         setTargetExam(data.targetExam || "");
                         setExamStage(data.examStage || "");
@@ -142,6 +184,60 @@ export default function ProfilePage() {
         }
     };
 
+    const getFormalMessage = () => {
+        const code = userData?.referralCode || "SONI100";
+        return (
+            `🎯 *SoniLearn - All India SSC & Railway Preparation Platform*\n\n` +
+            `नमस्ते! SSC और Railway एग्ज़ाम्स की बेहतरीन तैयारी के लिए SoniLearn ऐप इंस्टॉल करें। यहाँ 2016-2026 के ऑथेंटिक PYQ, डेली चैलेंज और डिटेल्ड सॉल्यूशंस उपलब्ध हैं।\n\n` +
+            `🎁 मेरा रेफरल कोड इस्तेमाल करने पर आपको मिलेगा *3 Days का Free Premium Access*!\n\n` +
+            `👉 मेरा कोड: *${code}*\n` +
+            `📲 ऐप इंस्टॉल करें: https://sonilearn.in`
+        );
+    };
+
+    const handleCopyReferral = () => {
+        const code = userData?.referralCode || "SONI100";
+        navigator.clipboard.writeText(code);
+        setCopiedReferral(true);
+        setTimeout(() => setCopiedReferral(false), 2500);
+    };
+
+    const handleNativeShare = async () => {
+        const msg = getFormalMessage();
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: "SoniLearn 3-Days Free Premium Pass",
+                    text: msg,
+                    url: "https://sonilearn.in",
+                });
+            } catch (err) {
+                console.log("Share cancelled or failed:", err);
+            }
+        } else {
+            handleWhatsAppShare();
+        }
+    };
+
+    const handleWhatsAppShare = () => {
+        const text = encodeURIComponent(getFormalMessage());
+        window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+    };
+
+    const handleTelegramShare = () => {
+        const text = encodeURIComponent(getFormalMessage());
+        window.open(`https://t.me/share/url?url=https://sonilearn.in&text=${text}`, "_blank");
+    };
+
+    const handleFacebookShare = () => {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=https://sonilearn.in`, "_blank");
+    };
+
+    const handleSmsShare = () => {
+        const text = encodeURIComponent(getFormalMessage());
+        window.open(`sms:?body=${text}`, "_blank");
+    };
+
     const handleFeedbackSubmit = async () => {
         if (!feedbackText.trim()) return;
 
@@ -190,9 +286,7 @@ export default function ProfilePage() {
     const getStageLabel = (exam: string, stageValue: string): string => {
         const config = MULTI_STAGE_EXAMS[exam];
         if (!config || !stageValue) return "";
-        const found = config.options.find(function (o) {
-            return o.value === stageValue;
-        });
+        const found = config.options.find((o) => o.value === stageValue);
         return found ? found.label : "";
     };
 
@@ -213,9 +307,183 @@ export default function ProfilePage() {
 
     const commitDisabled = !targetExam || (needsStageSelection && !examStage);
 
+    // Calculate readable current plan expiry for modal explanation
+    const getPlanExpiryText = () => {
+        const expiry = userData?.premiumUntil || userData?.trialEndDate;
+        if (expiry?.toDate) {
+            return expiry.toDate().toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric"
+            });
+        }
+        return "Active Free Pass";
+    };
+
     return (
         <div className="min-h-screen bg-slate-50/50 text-slate-900 pb-24 font-sans antialiased">
 
+            {/* 🎯 REFERRAL & VALIDITY INFO POPUP MODAL (TESTBOOK STYLE) */}
+            {showReferralModal && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl relative max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+                                    <Gift size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                                        Refer & Earn Free Pass
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500 font-medium">
+                                        Know how referral days are credited to your account
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowReferralModal(false)}
+                                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Current Plan Status Box */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/80 rounded-2xl p-4 my-4 flex items-center justify-between gap-3">
+                            <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block">
+                                    Current Pass Expiry
+                                </span>
+                                <span className="text-sm font-black text-slate-900">
+                                    {getPlanExpiryText()}
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                    Bonus Earned
+                                </span>
+                                <span className="text-sm font-black text-emerald-600">
+                                    +{userData?.bonusDaysEarned || 0} Days
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Clear 3-Step Process (Aapko 3 din kab aur kaise milenge) */}
+                        <div className="space-y-3 mb-5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                How It Works (आपको +3 दिन कैसे मिलेंगे):
+                            </span>
+
+                            <div className="flex items-start gap-3 bg-slate-50 border border-slate-200/60 p-3 rounded-2xl">
+                                <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    1
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-900">अपना कोड शेयर करें</h4>
+                                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+                                        अपने कोचिंग या लाइब्रेरी के दोस्तों को अपना रेफरल लिंक और कोड भेजें।
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 bg-slate-50 border border-slate-200/60 p-3 rounded-2xl">
+                                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    2
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-900">दोस्त ऐप इंस्टॉल करके साइन-अप करेगा</h4>
+                                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+                                        दोस्त को तुरंत 3 दिन का फ्री पास मिल जाएगा और वह अभ्यास शुरू कर सकेगा।
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 bg-emerald-50/60 border border-emerald-200/70 p-3 rounded-2xl">
+                                <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    3
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-emerald-950">पहला टेस्ट देते ही +3 दिन क्रेडिट!</h4>
+                                    <p className="text-[11px] text-emerald-800 leading-relaxed mt-0.5">
+                                        जैसे ही आपका दोस्त अपना पहला टेस्ट सबमिट करेगा, <strong>आपके मौजूदा प्लान की एक्सपायरी डेट में तुरंत +3 दिन एक्स्ट्रा जुड़ जाएँगे</strong>।
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Referral Code Display with Copy */}
+                        <div className="bg-slate-900 text-white rounded-2xl p-3.5 flex items-center justify-between gap-3 mb-4">
+                            <div>
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
+                                    Your Referral Code
+                                </span>
+                                <span className="text-base font-black tracking-widest text-amber-400 font-mono">
+                                    {userData?.referralCode || "SONI100"}
+                                </span>
+                            </div>
+                            <button
+                                onClick={handleCopyReferral}
+                                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center gap-1.5 active:scale-95 border border-white/10"
+                            >
+                                {copiedReferral ? (
+                                    <>
+                                        <Check size={13} className="text-emerald-400" /> Copied!
+                                    </>
+                                ) : (
+                                    <>
+                                        <Copy size={13} /> Copy
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Primary Share Button */}
+                        <button
+                            onClick={handleNativeShare}
+                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black h-12 rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 active:scale-98"
+                        >
+                            <Share2 size={16} /> Share With Friends (All Apps)
+                        </button>
+
+                        {/* Quick Channels Grid */}
+                        <div className="grid grid-cols-4 gap-2 mt-3">
+                            <button
+                                onClick={handleWhatsAppShare}
+                                className="py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-[10px] flex flex-col items-center justify-center gap-1 transition"
+                            >
+                                <MessageCircle size={15} />
+                                <span>WhatsApp</span>
+                            </button>
+                            <button
+                                onClick={handleTelegramShare}
+                                className="py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 font-bold text-[10px] flex flex-col items-center justify-center gap-1 transition"
+                            >
+                                <Send size={15} />
+                                <span>Telegram</span>
+                            </button>
+                            <button
+                                onClick={handleFacebookShare}
+                                className="py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-[10px] flex flex-col items-center justify-center gap-1 transition"
+                            >
+                                <Share2 size={15} />
+                                <span>Facebook</span>
+                            </button>
+                            <button
+                                onClick={handleSmsShare}
+                                className="py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-[10px] flex flex-col items-center justify-center gap-1 transition"
+                            >
+                                <Smartphone size={15} />
+                                <span>SMS</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* HEADER */}
             <div className="bg-white border-b border-slate-200/80 sticky top-0 z-40 backdrop-blur-md">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
                     <button
@@ -233,6 +501,7 @@ export default function ProfilePage() {
 
             <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
 
+                {/* HERO PROFILE BANNER */}
                 <div className="relative overflow-hidden bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-900/30 via-transparent to-transparent pointer-events-none" />
                     <div className="relative flex items-center gap-4 sm:gap-5">
@@ -366,7 +635,38 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        <div className="mt-6 pt-6 border-t border-slate-100">
+                        {/* 🎁 COMPACT 1-LINE REFERRAL ENTRY (OPENS MODAL WITHOUT CLUTTERING PAGE) */}
+                        <div className="mt-8 bg-gradient-to-r from-blue-50 via-indigo-50/60 to-slate-50 border border-blue-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/20 flex-shrink-0">
+                                    <Gift size={20} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs sm:text-sm font-black text-slate-900">
+                                            Refer Friends & Earn Free Pass
+                                        </span>
+                                        <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                                            +3 Days Free
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                        Dost pehla test dega toh dono ko +3 din ka free pass milega.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setShowReferralModal(true)}
+                                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-blue-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm active:scale-95 flex-shrink-0"
+                            >
+                                <span>Details & Share</span>
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+
+                        {/* FEEDBACK SECTION */}
+                        <div className="mt-8 pt-6 border-t border-slate-100">
                             <div className="mb-4">
                                 <h3 className="text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
                                     <MessageSquare className="text-blue-600" size={18} /> Send Feedback
@@ -417,6 +717,7 @@ export default function ProfilePage() {
                         </div>
                     </div>
 
+                    {/* SIDEBAR CREDENTIALS & LOGOUT */}
                     <div className="space-y-5">
                         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
                             <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-4 block">Identity Credentials</span>
