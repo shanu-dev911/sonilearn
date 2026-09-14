@@ -188,7 +188,7 @@ export default function ProfilePage() {
         const code = userData?.referralCode || "SONI100";
         return (
             `🎯 *SoniLearn - All India SSC & Railway Preparation Platform*\n\n` +
-            `नमस्ते! SSC और Railway एग्ज़ाम्स की बेहतरीन तैयारी के लिए SoniLearn ऐप इंस्टॉल करें। यहाँ 2016-2026 के ऑथेंटिक PYQ, डेली चैलेंज और डिटेल्ड सॉल्यूशंस उपलब्ध हैं।\n\n` +
+            ` SSC और Railway एग्ज़ाम्स की बेहतरीन तैयारी के लिए SoniLearn ऐप इंस्टॉल करें। यहाँ 2016-2026 के ऑथेंटिक PYQ, डेली चैलेंज और डिटेल्ड सॉल्यूशंस उपलब्ध हैं।\n\n` +
             `🎁 मेरा रेफरल कोड इस्तेमाल करने पर आपको मिलेगा *3 Days का Free Premium Access*!\n\n` +
             `👉 मेरा कोड: *${code}*\n` +
             `📲 ऐप इंस्टॉल करें: https://sonilearn.in`
