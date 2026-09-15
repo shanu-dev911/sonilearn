@@ -22,7 +22,7 @@ declare global {
 }
 
 const BASE_PRICE_INR = 49;
-const DISCOUNT_AMOUNT = 5; // दोस्त का कोड लगाने पर ₹5 की छूट
+const DISCOUNT_AMOUNT = 10; // दोस्त का कोड लगाने पर 10% की छूट
 
 export default function PremiumPage() {
     const router = useRouter();

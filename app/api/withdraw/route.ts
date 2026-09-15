@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
-const MINIMUM_WITHDRAWAL_INR = 80;
+const MINIMUM_WITHDRAWAL_INR = 100;
 
 export async function POST(req: Request) {
     try {

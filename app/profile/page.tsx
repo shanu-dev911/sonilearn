@@ -86,7 +86,7 @@ const MULTI_STAGE_EXAMS: Record<string, StageConfigEntry> = {
     },
 };
 
-const MIN_WITHDRAWAL_INR = 80;
+const MIN_WITHDRAWAL_INR = 100;
 
 function generateReferralCode(name: string): string {
     const cleanName = (name || "SL").replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 3) || "SL";
