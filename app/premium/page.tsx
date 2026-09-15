@@ -7,11 +7,11 @@ import { motion } from "framer-motion";
 import {
     Crown, Sparkles, Zap, Trophy, BookOpen,
     BarChart3, ShieldCheck, CheckCircle2, ArrowLeft, ShieldAlert, Loader2,
-    ScrollText, Newspaper
+    ScrollText, Newspaper, Tag, X, Check
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase-client";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { checkTrialStatus } from "@/lib/trial-check";
 
@@ -21,7 +21,8 @@ declare global {
     }
 }
 
-const PRICE_INR = 49;
+const BASE_PRICE_INR = 49;
+const DISCOUNT_AMOUNT = 5; // दोस्त का कोड लगाने पर ₹5 की छूट
 
 export default function PremiumPage() {
     const router = useRouter();
@@ -31,6 +32,12 @@ export default function PremiumPage() {
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
     const [scriptLoaded, setScriptLoaded] = useState(false);
+
+    // 🎁 Referral / Coupon States
+    const [couponInput, setCouponInput] = useState("");
+    const [appliedReferral, setAppliedReferral] = useState<string | null>(null);
+    const [couponVerifying, setCouponVerifying] = useState(false);
+    const [couponError, setCouponError] = useState("");
 
     useEffect(() => {
         const script = document.createElement("script");
@@ -51,7 +58,14 @@ export default function PremiumPage() {
                 const userRef = doc(db, "users", currentUser.uid);
                 const userSnap = await getDoc(userRef);
                 if (userSnap.exists()) {
-                    setUserData(userSnap.data());
+                    const data = userSnap.data();
+                    setUserData(data);
+
+                    // अगर यूज़र साइनअप के समय किसी का कोड लगाकर आया था, तो उसे ऑटो-फिल कर दो
+                    if (data?.referredBy && !data?.referralRewarded) {
+                        setCouponInput(data.referredBy);
+                        setAppliedReferral(data.referredBy);
+                    }
                 }
             } else {
                 router.push("/?upgraded=true");
@@ -61,6 +75,48 @@ export default function PremiumPage() {
 
         return () => unsubscribe();
     }, [router]);
+
+    // रेफ़रल कोड वेरिफाई करने का फ़ंक्शन
+    const handleApplyCoupon = async () => {
+        const cleanCode = couponInput.trim().toUpperCase();
+        setCouponError("");
+
+        if (!cleanCode) return;
+
+        if (userData?.referralCode && cleanCode === userData.referralCode.toUpperCase()) {
+            setCouponError("आप अपना खुद का कोड इस्तेमाल नहीं कर सकते!");
+            return;
+        }
+
+        setCouponVerifying(true);
+        try {
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("referralCode", "==", cleanCode));
+            const snap = await getDocs(q);
+
+            if (!snap.empty) {
+                setAppliedReferral(cleanCode);
+                setCouponError("");
+            } else {
+                setCouponError("अमान्य रेफरल कोड! कृपया सही कोड दर्ज करें।");
+                setAppliedReferral(null);
+            }
+        } catch (err) {
+            console.error("Coupon check error:", err);
+            setCouponError("कोड जांचने में समस्या हुई। कृपया पुनः प्रयास करें।");
+        } finally {
+            setCouponVerifying(false);
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedReferral(null);
+        setCouponInput("");
+        setCouponError("");
+    };
+
+    // डिस्काउंट के बाद फाइनल प्राइस
+    const finalPrice = appliedReferral ? (BASE_PRICE_INR - DISCOUNT_AMOUNT) : BASE_PRICE_INR;
 
     const handlePayment = async () => {
         if (!user || !scriptLoaded) return;
@@ -72,10 +128,11 @@ export default function PremiumPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    amount: PRICE_INR,
+                    amount: finalPrice,
                     userId: user.uid,
                     userName: userData?.name || user.displayName || "Student",
                     userEmail: user.email,
+                    referralCode: appliedReferral || null, // 🎯 पास किया रेफरल कोड
                 }),
             });
 
@@ -92,7 +149,9 @@ export default function PremiumPage() {
                 amount: orderData.order.amount,
                 currency: "INR",
                 name: "SoniLearn",
-                description: "Premium Access — Unlock All Features",
+                description: appliedReferral
+                    ? `Premium Pass (Referral Discount Applied: ${appliedReferral})`
+                    : "Premium Access — Unlock All Features",
                 order_id: orderData.order.id,
                 handler: async function (response: any) {
                     console.log("Razorpay success callback response:", response);
@@ -105,12 +164,12 @@ export default function PremiumPage() {
                                 razorpay_payment_id: response.razorpay_payment_id,
                                 razorpay_signature: response.razorpay_signature,
                                 userId: user.uid,
+                                amountPaid: finalPrice,
+                                referralCode: appliedReferral || null, // 🎯 वेरिफाई के लिए कोड भेजा
                             }),
                         });
 
-                        console.log("Verify payment response status:", verifyRes.status);
                         const verifyData = await verifyRes.json();
-                        console.log("Verify payment body:", verifyData);
 
                         if (verifyData.success) {
                             const userRef = doc(db, "users", user.uid);
@@ -152,6 +211,7 @@ export default function PremiumPage() {
             setProcessing(false);
         }
     };
+
     const features = [
         { icon: Zap, text: " Warrior Battle Ground ", desc: "No cooling-down period between assessment cycles." },
         { icon: Trophy, text: "All India Leaderboard Matrix", desc: "Compare target scores across live peer metrics." },
@@ -162,7 +222,6 @@ export default function PremiumPage() {
         { icon: CheckCircle2, text: "Daily Premium Challenge Access", desc: "Execute hyper-focused exclusive daily items." },
     ];
 
-
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -171,7 +230,6 @@ export default function PremiumPage() {
         );
     }
 
-    // 🎯 If already premium, show a simple confirmation instead of the pricing card
     const trialStatus = userData
         ? checkTrialStatus(userData)
         : {
@@ -210,11 +268,11 @@ export default function PremiumPage() {
                     onClick={() => router.push("/")}
                     className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors bg-white hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-200/60 shadow-sm"
                 >
-                    <ArrowLeft size={14} /> 
+                    <ArrowLeft size={14} /> Back
                 </button>
             </div>
 
-            {/* PRESTIGE MESH HERO PANEL */}
+            {/* HERO PANEL */}
             <section className="relative overflow-hidden bg-slate-950 text-white border-b border-slate-900 -mt-16 pt-24 pb-28">
                 <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.4),transparent_50%)] pointer-events-none"></div>
                 <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none"></div>
@@ -250,7 +308,7 @@ export default function PremiumPage() {
                         Find weak topics, unlock unlimited practice, and boost your exam score
                     </motion.p>
 
-                    {/* 🎯 TRIAL STATUS BANNER */}
+                    {/* TRIAL STATUS BANNER */}
                     {trialStatus.isTrialActive ? (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
@@ -273,7 +331,7 @@ export default function PremiumPage() {
                 </div>
             </section>
 
-            {/* PRICING SCHEMATICS WRAPPER */}
+            {/* PRICING SECTION */}
             <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-30">
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-8 items-stretch max-w-5xl mx-auto">
 
@@ -288,22 +346,79 @@ export default function PremiumPage() {
                             <div className="inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-md text-[10px] font-black tracking-widest uppercase">
                                 <Crown size={12} /> Launch Promotion Plan
                             </div>
-                            <div className="flex items-baseline justify-center gap-1 mt-4">
-                                <span className="text-5xl font-black tracking-tight">₹{PRICE_INR}</span>
+                            <div className="flex items-baseline justify-center gap-2 mt-4">
+                                {appliedReferral && (
+                                    <span className="text-2xl font-bold line-through text-amber-200">₹{BASE_PRICE_INR}</span>
+                                )}
+                                <span className="text-5xl font-black tracking-tight">₹{finalPrice}</span>
                                 <span className="text-slate-100/80 text-xs font-bold uppercase tracking-wider">/ Month</span>
                             </div>
-                            <p className="text-[11px] font-bold text-amber-100 mt-2 tracking-wide">
-                                
-                            </p>
+                            {appliedReferral && (
+                                <p className="text-[11px] font-black text-amber-100 mt-1 uppercase tracking-wider">
+                                    🎉 ₹5 Referral Discount Applied!
+                                </p>
+                            )}
                         </div>
 
                         <div className="p-6 flex-1 flex flex-col justify-between gap-6">
+
+                            {/* 🎁 COUPON / REFERRAL CODE INPUT */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                        <Tag size={13} className="text-indigo-600" /> Have a Referral Code?
+                                    </span>
+                                    {appliedReferral && (
+                                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                                            <Check size={11} /> Applied
+                                        </span>
+                                    )}
+                                </div>
+
+                                {!appliedReferral ? (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Enter Friend's Code"
+                                            value={couponInput}
+                                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                            className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-800 outline-none focus:border-blue-500"
+                                        />
+                                        <button
+                                            onClick={handleApplyCoupon}
+                                            disabled={couponVerifying || !couponInput.trim()}
+                                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition disabled:opacity-50"
+                                        >
+                                            {couponVerifying ? "Checking..." : "Apply"}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl">
+                                        <div>
+                                            <span className="text-[10px] font-bold text-emerald-600 block uppercase tracking-wider">Applied Code</span>
+                                            <span className="text-xs font-black text-emerald-900 tracking-widest">{appliedReferral}</span>
+                                        </div>
+                                        <button
+                                            onClick={handleRemoveCoupon}
+                                            className="w-6 h-6 rounded-full bg-emerald-200/60 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition"
+                                            title="Remove Code"
+                                        >
+                                            <X size={13} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {couponError && (
+                                    <p className="text-[11px] font-bold text-rose-500 mt-2">{couponError}</p>
+                                )}
+                            </div>
+
                             <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-4">
                                 <p className="text-blue-800 font-black text-sm flex items-center gap-2">
-                                    <span>🎉</span> 72-Hour Evaluation Window
+                                    <span>🎉</span> Instant Full Unlock
                                 </p>
                                 <p className="text-slate-600 text-xs mt-1.5 font-medium leading-relaxed">
-                                    Initiate full environment calibration. Complete feature deployment unlocks instantly for 3 days. Cancel anytime.
+                                    Complete feature deployment unlocks immediately for 30 days. No restrictions.
                                 </p>
                             </div>
 
@@ -318,13 +433,9 @@ export default function PremiumPage() {
                                             <Loader2 size={16} className="animate-spin" /> Processing...
                                         </>
                                     ) : (
-                                        "PAY NOW"
+                                        `PAY ₹${finalPrice}`
                                     )}
                                 </button>
-
-                                <p className="mt-4 text-center text-[11px] text-slate-400 font-medium leading-relaxed">
-                                    Post quota consumption, baseline standard pricing normalizes to <span className="font-bold text-slate-600">₹99/month</span>.
-                                </p>
 
                                 <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                                     <ShieldCheck size={14} className="text-emerald-500" />
@@ -334,7 +445,7 @@ export default function PremiumPage() {
                         </div>
                     </motion.div>
 
-                    {/* VALUE METRICS EXPANSION NODE */}
+                    {/* VALUE METRICS */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -366,7 +477,7 @@ export default function PremiumPage() {
 
                         <div className="mt-8 pt-4 border-t border-slate-100 flex items-start gap-2.5 text-[10px] text-slate-400 font-medium leading-relaxed">
                             <ShieldAlert size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                            <span>System configurations auto-renew monthly unless operation parameters are manually terminated in workspace configurations panel.</span>
+                            <span>Plan activates instantly upon successful verification. Cancel anytime.</span>
                         </div>
                     </motion.div>
 
