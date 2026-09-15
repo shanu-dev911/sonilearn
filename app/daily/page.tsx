@@ -61,10 +61,7 @@ function formatTime(sec: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// 🎯 STRONG RUNTIME RESHUFFLE — double-pass Fisher-Yates using crypto randomness
-// where available. Guarantees option order is genuinely randomized fresh every
-// single load, regardless of any pattern the questions were saved with in the
-// database (e.g. never predictable, never always the same position).
+// 🎯 Double-pass Fisher-Yates with crypto randomness
 function getSecureRandom(): number {
   if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
     const arr = new Uint32Array(1);
@@ -84,7 +81,6 @@ function fisherYatesShuffle(arr: number[]): number[] {
 }
 
 function shuffleQuestionOptions(optEn: string[], optHi: string[], correctIndex: number) {
-  // Double-pass shuffle for extra guaranteed randomness
   let indices = fisherYatesShuffle([0, 1, 2, 3]);
   indices = fisherYatesShuffle(indices);
 
@@ -235,7 +231,7 @@ export default function DailyChallengePage() {
     loadSubjects();
   }, [targetExam]);
 
-  // STEP 2 — LOAD QUESTIONS FOR SELECTED SUBJECT (with runtime verification + reshuffle)
+  // STEP 2 — LOAD QUESTIONS FOR SELECTED SUBJECT
   const startQuizForSubject = async (subject: string) => {
     try {
       setSelectedSubject(subject);
@@ -263,9 +259,6 @@ export default function DailyChallengePage() {
         const data: any = d.data();
         const answerKey = data.answer?.toString().toUpperCase();
 
-        // VERIFICATION — every question must have a valid answer key mapping
-        // to one of the 4 options. If mapping is broken, question is skipped
-        // entirely rather than shown with a wrong/blank answer.
         const optionMap: Record<string, string> = {
           A: data.optionA,
           B: data.optionB,
@@ -280,7 +273,6 @@ export default function DailyChallengePage() {
           data.optionA && data.optionB && data.optionC && data.optionD;
 
         if (!primaryText || !allOptionsPresent || !answerValue) {
-          // Invalid/incomplete question — skip, never show to user
           return;
         }
 
@@ -294,8 +286,6 @@ export default function DailyChallengePage() {
 
         const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
 
-        // RUNTIME RESHUFFLE — options re-randomized fresh every load,
-        // so the correct answer position is never predictable/patterned.
         const { newOptEn, newOptHi, newCorrectText } = shuffleQuestionOptions(
           rawOptEn,
           rawOptHi,
@@ -370,6 +360,7 @@ export default function DailyChallengePage() {
     }
   };
 
+  // 🎯 FINISH TEST (CLEAN: NO TRIAL DATE EXTENSIONS)
   const finishTest = async () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setPhase("submitting");
@@ -384,6 +375,7 @@ export default function DailyChallengePage() {
     const activeUserId = user?.uid || auth.currentUser?.uid || "guest";
 
     try {
+      // 1. Record Exam Result
       await addDoc(collection(db, "exam_results"), {
         userId: activeUserId,
         userName: user?.displayName || user?.email || "Student",
@@ -394,6 +386,7 @@ export default function DailyChallengePage() {
         createdAt: serverTimestamp(),
       });
 
+      // 2. Commit Weak Questions Log
       const weakQuestionsToLog = questions.flatMap((q, i) => {
         const selectedAnswer = (answers[i] || "").trim();
 
@@ -690,8 +683,8 @@ export default function DailyChallengePage() {
               onClick={nextQuestion}
               disabled={!answers[current]}
               className={`flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm uppercase tracking-wider ${answers[current]
-                ? "bg-slate-900 hover:bg-slate-800 text-white"
-                : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                  ? "bg-slate-900 hover:bg-slate-800 text-white"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                 }`}
             >
               {current === questions.length - 1 ? (
@@ -720,10 +713,10 @@ export default function DailyChallengePage() {
                   key={i}
                   onClick={() => setCurrent(i)}
                   className={`h-9 rounded-lg font-bold text-xs transition-all border ${isCurrent
-                    ? "bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-100"
-                    : isAnswered
-                      ? "bg-blue-50 border-blue-200 text-blue-600 font-black"
-                      : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                      : isAnswered
+                        ? "bg-blue-50 border-blue-200 text-blue-600 font-black"
+                        : "bg-slate-50/50 border-slate-200/60 text-slate-400 font-medium"
                     }`}
                 >
                   {i + 1}
