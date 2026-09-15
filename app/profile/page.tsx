@@ -242,8 +242,8 @@ export default function ProfilePage() {
         return (
             `🎯 *SoniLearn - SSC & Railway Mock Tests*\n\n` +
             `SSC और Railway परीक्षाओं की तैयारी के लिए SoniLearn ऐप इस्तेमाल करें। यहाँ TCS पैटर्न के PYQ और रियल टाइम ऑल इंडिया टेस्ट उपलब्ध हैं।\n\n` +
-            `🎁 मेरा कूपन कोड इस्तेमाल करके प्रीमियम पास पर तुरंत ₹5 की छूट पाएं!\n\n` +
-            `👉 कूपन कोड: *${code}*\n` +
+                `🎁 मेरा कूपन कोड इस्तेमाल करके प्रीमियम पास पर तुरंत 10% की छूट पाएं!\n\n` +
+                `👉 कूपन कोड: *${code}*\n` +
             `📲 वेबसाइट पर जाएं: https://sonilearn.in`
         );
     };
@@ -412,7 +412,7 @@ export default function ProfilePage() {
                                     2
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-slate-900">दोस्त को ₹5 की छूट मिलेगी</h4>
+                                    <h4 className="text-xs font-bold text-slate-900">दोस्त को 10% की छूट मिलेगी</h4>
                                     <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
                                         जब वह ₹49 का प्रीमियम पास खरीदेगा, तो आपका कोड लगाने पर उसे पास सिर्फ ₹44 में मिलेगा।
                                     </p>
@@ -426,7 +426,7 @@ export default function ProfilePage() {
                                 <div>
                                     <h4 className="text-xs font-bold text-emerald-950">आपको ₹10 का सीधा कैश!</h4>
                                     <p className="text-[11px] text-emerald-800 leading-relaxed mt-0.5">
-                                        पेमेंट सफल होते ही आपके वॉलेट में ₹10 जुड़ जाएँगे। ₹80 होते ही आप UPI से सीधे निकाल सकते हैं।
+                                        पेमेंट सफल होते ही आपके वॉलेट में ₹10 जुड़ जाएँगे। ₹100 होते ही आप UPI से सीधे निकाल सकते हैं।
                                     </p>
                                 </div>
                             </div>
@@ -533,7 +533,7 @@ export default function ProfilePage() {
                                 </div>
                             </div>
 
-                            {/* Progress bar towards ₹80 */}
+                            {/* Progress bar towards ₹100 */}
                             <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 mb-5">
                                 <div className="flex justify-between text-xs font-bold text-slate-600 mb-2">
                                     <span>Payout Goal (Min ₹{MIN_WITHDRAWAL_INR})</span>
@@ -547,7 +547,7 @@ export default function ProfilePage() {
                                 </div>
                                 <p className="text-[11px] text-slate-400 font-medium mt-2">
                                     {walletBalance >= MIN_WITHDRAWAL_INR
-                                        ? "🎉 बधाई! आपका बैलेंस ₹80 पार हो गया है। नीचे अपनी UPI ID डालकर तुरंत विथड्रॉ करें।"
+                                        ? "🎉 बधाई! आपका बैलेंस ₹100 पार हो गया है। नीचे अपनी UPI ID डालकर तुरंत विथड्रॉ करें।"
                                         : `विथड्रॉ अनलॉक करने के लिए ₹${MIN_WITHDRAWAL_INR - walletBalance} और चाहिए (लगभग ${Math.ceil((MIN_WITHDRAWAL_INR - walletBalance) / 10)} सफल रेफरल)।`}
                                 </p>
                             </div>
@@ -719,7 +719,7 @@ export default function ProfilePage() {
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                            दोस्त को ₹5 की छूट और आपको ₹10 का सीधा UPI कैश मिलेगा।
+                                            दोस्त को 10% की छूट और आपको ₹10 का सीधा UPI कैश मिलेगा।
                                         </p>
                                     </div>
                                 </div>

@@ -22,7 +22,7 @@ declare global {
 }
 
 const BASE_PRICE_INR = 49;
-const DISCOUNT_AMOUNT = 10; // दोस्त का कोड लगाने पर 10% की छूट
+const DISCOUNT_PERCENT = 10;
 
 export default function PremiumPage() {
     const router = useRouter();
@@ -116,7 +116,9 @@ export default function PremiumPage() {
     };
 
     // डिस्काउंट के बाद फाइनल प्राइस
-    const finalPrice = appliedReferral ? (BASE_PRICE_INR - DISCOUNT_AMOUNT) : BASE_PRICE_INR;
+    const finalPrice = appliedReferral
+        ? Math.round(BASE_PRICE_INR * (1 - DISCOUNT_PERCENT / 100))
+        : BASE_PRICE_INR;
 
     const handlePayment = async () => {
         if (!user || !scriptLoaded) return;
@@ -355,7 +357,7 @@ export default function PremiumPage() {
                             </div>
                             {appliedReferral && (
                                 <p className="text-[11px] font-black text-amber-100 mt-1 uppercase tracking-wider">
-                                    🎉 ₹5 Referral Discount Applied!
+                                    🎉 10% Referral Discount Applied!
                                 </p>
                             )}
                         </div>

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
             studentEmail = userData.email || "";
 
             if (currentBalance < MINIMUM_WITHDRAWAL_INR) {
-                throw new Error(`निकासी के लिए कम से कम ₹${MINIMUM_WITHDRAWAL_INR} का बैलेंस होना आवश्यक है।`);
+                throw new Error("निकासी के लिए कम से कम ₹100 का बैलेंस होना आवश्यक है।");
             }
 
             payoutAmount = currentBalance;
