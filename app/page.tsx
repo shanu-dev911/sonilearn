@@ -719,6 +719,15 @@ export default function Dashboard() {
               </div>
             </div>
 
+            <div className="pt-1">
+              <a
+                href="/privacy-policy"
+                className="text-xs font-bold text-slate-500 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-blue-600 hover:decoration-blue-300"
+              >
+                Privacy Policy
+              </a>
+            </div>
+
             <div className="pt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
               © {new Date().getFullYear()} SoniLearn. All rights reserved.
             </div>
