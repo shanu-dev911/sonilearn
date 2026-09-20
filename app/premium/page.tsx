@@ -21,8 +21,13 @@ declare global {
     }
 }
 
-const BASE_PRICE_INR = 49;
 const DISCOUNT_PERCENT = 10;
+const PLANS = {
+    MONTHLY: { label: "Monthly Pass", price: 49, validityDays: 30 },
+    YEARLY: { label: "Yearly Pass", price: 499, validityDays: 365 },
+} as const;
+
+type PlanType = keyof typeof PLANS;
 
 export default function PremiumPage() {
     const router = useRouter();
@@ -32,6 +37,7 @@ export default function PremiumPage() {
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
     const [scriptLoaded, setScriptLoaded] = useState(false);
+    const [planType, setPlanType] = useState<PlanType>("YEARLY");
 
     // 🎁 Referral / Coupon States
     const [couponInput, setCouponInput] = useState("");
@@ -115,10 +121,10 @@ export default function PremiumPage() {
         setCouponError("");
     };
 
-    // डिस्काउंट के बाद फाइनल प्राइस
+    const selectedPlan = PLANS[planType];
     const finalPrice = appliedReferral
-        ? Math.round(BASE_PRICE_INR * (1 - DISCOUNT_PERCENT / 100))
-        : BASE_PRICE_INR;
+        ? Math.round(selectedPlan.price * (1 - DISCOUNT_PERCENT / 100))
+        : selectedPlan.price;
 
     const handlePayment = async () => {
         if (!user || !scriptLoaded) return;
@@ -131,6 +137,8 @@ export default function PremiumPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     amount: finalPrice,
+                    planType,
+                    validityDays: selectedPlan.validityDays,
                     userId: user.uid,
                     userName: userData?.name || user.displayName || "Student",
                     userEmail: user.email,
@@ -167,6 +175,8 @@ export default function PremiumPage() {
                                 razorpay_signature: response.razorpay_signature,
                                 userId: user.uid,
                                 amountPaid: finalPrice,
+                                planType,
+                                validityDays: selectedPlan.validityDays,
                                 referralCode: appliedReferral || null, // 🎯 वेरिफाई के लिए कोड भेजा
                             }),
                         });
@@ -344,17 +354,54 @@ export default function PremiumPage() {
                         transition={{ delay: 0.15 }}
                         className="bg-white border border-slate-200/90 rounded-3xl shadow-xl overflow-hidden flex flex-col justify-between"
                     >
+                        <div className="p-3 bg-slate-100 border-b border-slate-200">
+                            <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Choose premium plan">
+                                {(Object.keys(PLANS) as PlanType[]).map((type) => {
+                                    const plan = PLANS[type];
+                                    const isSelected = type === planType;
+                                    return (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            role="tab"
+                                            aria-selected={isSelected}
+                                            onClick={() => setPlanType(type)}
+                                            className={`relative rounded-xl px-3 py-3 text-left transition ${isSelected
+                                                ? "bg-white text-slate-900 shadow-sm ring-2 ring-blue-500"
+                                                : "text-slate-500 hover:bg-white/70"
+                                                }`}
+                                        >
+                                            {type === "YEARLY" && (
+                                                <span className="absolute -top-2 right-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                                                    Best Value
+                                                </span>
+                                            )}
+                                            <span className="block text-xs font-black">{plan.label}</span>
+                                            <span className="mt-1 block text-lg font-black">₹{plan.price}</span>
+                                            <span className="block text-[10px] font-bold uppercase tracking-wide opacity-70">
+                                                {plan.validityDays} days
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                         <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-5 text-center text-white">
                             <div className="inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-md text-[10px] font-black tracking-widest uppercase">
                                 <Crown size={12} /> Launch Promotion Plan
                             </div>
                             <div className="flex items-baseline justify-center gap-2 mt-4">
                                 {appliedReferral && (
-                                    <span className="text-2xl font-bold line-through text-amber-200">₹{BASE_PRICE_INR}</span>
+                                    <span className="text-2xl font-bold line-through text-amber-200">₹{selectedPlan.price}</span>
                                 )}
                                 <span className="text-5xl font-black tracking-tight">₹{finalPrice}</span>
-                                <span className="text-slate-100/80 text-xs font-bold uppercase tracking-wider">/ Month</span>
+                                <span className="text-slate-100/80 text-xs font-bold uppercase tracking-wider">/ {planType === "YEARLY" ? "Year" : "Month"}</span>
                             </div>
+                            {planType === "YEARLY" && (
+                                <p className="text-[11px] font-black text-amber-100 mt-1 uppercase tracking-wider">
+                                    Save ₹89 vs twelve monthly renewals
+                                </p>
+                            )}
                             {appliedReferral && (
                                 <p className="text-[11px] font-black text-amber-100 mt-1 uppercase tracking-wider">
                                     🎉 10% Referral Discount Applied!
@@ -420,7 +467,7 @@ export default function PremiumPage() {
                                     <span>🎉</span> Instant Full Unlock
                                 </p>
                                 <p className="text-slate-600 text-xs mt-1.5 font-medium leading-relaxed">
-                                    Complete feature deployment unlocks immediately for 30 days. No restrictions.
+                                    Complete feature deployment unlocks immediately for {selectedPlan.validityDays} days. No restrictions.
                                 </p>
                             </div>
 

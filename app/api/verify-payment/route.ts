@@ -4,7 +4,6 @@ import { getDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
-const PREMIUM_DAYS = 30;
 const REFERRAL_COMMISSION_INR = 10; // 🎯 दोस्त के सफल पेमेंट पर मिलने वाला कमीशन
 
 export async function POST(req: Request) {
@@ -17,6 +16,7 @@ export async function POST(req: Request) {
       userId,
       referralCode,
       amountPaid,
+      planType,
     } = body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !userId) {
@@ -44,7 +44,9 @@ export async function POST(req: Request) {
     // 🎯 SIGNATURE VALID — Process in Database
     const db = getDb();
     const now = new Date();
-    const premiumExpiresAt = new Date(now.getTime() + PREMIUM_DAYS * MS_PER_DAY).toISOString();
+    const validityDays = planType === "YEARLY" ? 365 : 30;
+    const savedPlanType = planType === "YEARLY" ? "YEARLY" : "MONTHLY";
+    const premiumExpiresAt = new Date(now.getTime() + validityDays * MS_PER_DAY).toISOString();
 
     const buyerRef = db.collection("users").doc(userId);
     const buyerSnap = await buyerRef.get();
@@ -58,6 +60,7 @@ export async function POST(req: Request) {
         premiumExpiresAt,
         lastPaymentId: razorpay_payment_id,
         lastOrderId: razorpay_order_id,
+        planType: savedPlanType,
         amountPaid: amountPaid || 49,
         updatedAt: now.toISOString(),
       },
