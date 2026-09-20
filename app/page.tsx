@@ -27,12 +27,7 @@ import {
   Heart,
   History,
   CheckCircle2,
-  XCircle,
-  Star,
-  Award,
-  Users,
-  BookCheck,
-  ShieldCheck
+  XCircle
 } from "lucide-react";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import UpdatePwaBanner from "@/components/UpdatePwaBanner";
@@ -447,78 +442,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
-        {/* SOCIAL PROOF & TRUST HIGHLIGHTS */}
-        <section className="mb-6 sm:mb-8" aria-label="SoniLearn trust highlights">
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {[
-              {
-                value: "100,000+",
-                label: "TCS Pattern Real PYQs",
-                detail: "2016-2026",
-                icon: BookCheck,
-                color: "text-blue-600",
-                background: "bg-blue-50",
-              },
-              {
-                value: "All India",
-                label: "Live Mock Ranking",
-                detail: "& Percentile",
-                icon: Users,
-                color: "text-indigo-600",
-                background: "bg-indigo-50",
-              },
-              {
-                value: "3 Days",
-                label: "Instant Free Trial Pass",
-                detail: "Zero Card Required",
-                icon: ShieldCheck,
-                color: "text-emerald-600",
-                background: "bg-emerald-50",
-              },
-              {
-                value: "4.8 / 5",
-                label: "Rated by Aspirants",
-                detail: "SSC & Railway",
-                icon: Star,
-                color: "text-amber-600",
-                background: "bg-amber-50",
-              },
-            ].map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.value} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
-                  <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${stat.background} ${stat.color}`}>
-                    <Icon size={18} />
-                  </div>
-                  <p className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">{stat.value}</p>
-                  <p className="mt-1 text-[11px] font-bold leading-snug text-slate-600 sm:text-xs">{stat.label}</p>
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{stat.detail}</p>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-200/80 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { icon: Users, text: "Full Bilingual", detail: "Hindi & English" },
-              { icon: Award, text: "Real TCS Exam Interface", detail: "Timer & sectional cutoffs" },
-              { icon: BookCheck, text: "Instant Detailed Solutions", detail: "Identify weak areas faster" },
-              { icon: ShieldCheck, text: "Study Anywhere", detail: "Mobile, tablet & desktop" },
-            ].map((highlight) => {
-              const Icon = highlight.icon;
-              return (
-                <div key={highlight.text} className="flex items-center gap-3 bg-white px-4 py-3.5 sm:px-5">
-                  <Icon size={18} className="shrink-0 text-blue-600" />
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-black text-slate-800">{highlight.text}</p>
-                    <p className="truncate text-[10px] font-medium text-slate-500">{highlight.detail}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
 
         {/* METRICS SECTION */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">

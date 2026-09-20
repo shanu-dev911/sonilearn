@@ -20,10 +20,9 @@ export default function WhatsAppButton({
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Contact SoniLearn support on WhatsApp"
-      className="fixed bottom-20 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:ring-offset-2 active:scale-95 sm:bottom-6 sm:right-6"
+      className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-md shadow-emerald-900/20 transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:ring-offset-2 active:scale-95"
     >
-      <MessageCircle size={20} aria-hidden="true" />
-      <span>WhatsApp Support</span>
+      <MessageCircle size={23} aria-hidden="true" />
     </a>
   );
 }
