@@ -1,6 +1,7 @@
 import './globals.css';
 import { FirebaseProvider } from '@/context/FirebaseContext';
 import InstallPromptManager from '@/components/InstallPromptManager';
+import WhatsAppButton from '@/components/WhatsAppButton';
 import type { Metadata, Viewport } from 'next';
 
 // 👇 Yeh line pure project ke static prerendering error ko bypass kar degi
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <FirebaseProvider>
           <InstallPromptManager />
           {children}
+          <WhatsAppButton />
         </FirebaseProvider>
       </body>
     </html>

@@ -4,7 +4,7 @@ import Razorpay from "razorpay";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { amount, userId, userName, userEmail } = body;
+    const { amount, userId, userName, userEmail, planType, validityDays } = body;
 
     if (!amount || !userId) {
       return NextResponse.json(
@@ -41,6 +41,8 @@ export async function POST(req: Request) {
         userId: String(userId),
         userName: userName || "Student",
         userEmail: userEmail || "",
+        planType: planType === "YEARLY" ? "YEARLY" : "MONTHLY",
+        validityDays: planType === "YEARLY" ? 365 : validityDays || 30,
       },
     };
 
