@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
+import loadClientComponent from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { onAuthStateChanged } from "firebase/auth";
@@ -29,8 +30,9 @@ import {
   CheckCircle2,
   XCircle
 } from "lucide-react";
-import InstallPrompt from "@/components/InstallPrompt";
-import UpdatePwaBanner from "@/components/UpdatePwaBanner";
+const WhatsAppButton = loadClientComponent(() => import("@/components/WhatsAppButton"), { ssr: false });
+const InstallPrompt = loadClientComponent(() => import("@/components/InstallPrompt"), { ssr: false });
+const UpdatePwaBanner = loadClientComponent(() => import("@/components/UpdatePwaBanner"), { ssr: false });
 
 interface TestAttempt {
   id: string;
@@ -741,6 +743,7 @@ export default function Dashboard() {
         </footer>
       </main>
 
+      <WhatsAppButton />
       <InstallPrompt />
       <UpdatePwaBanner />
     </div>
