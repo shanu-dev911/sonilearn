@@ -24,6 +24,7 @@ declare global {
 const DISCOUNT_PERCENT = 10;
 const PLANS = {
     MONTHLY: { label: "Monthly Pass", price: 49, validityDays: 30 },
+    QUARTERLY: { label: "Quarterly Pass", price: 129, validityDays: 90 },
     YEARLY: { label: "Yearly Pass", price: 499, validityDays: 365 },
 } as const;
 
@@ -37,7 +38,7 @@ export default function PremiumPage() {
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
     const [scriptLoaded, setScriptLoaded] = useState(false);
-    const [planType, setPlanType] = useState<PlanType>("YEARLY");
+    const [planType, setPlanType] = useState<PlanType>("QUARTERLY");
 
     // 🎁 Referral / Coupon States
     const [couponInput, setCouponInput] = useState("");
@@ -355,7 +356,7 @@ export default function PremiumPage() {
                         className="bg-white border border-slate-200/90 rounded-3xl shadow-xl overflow-hidden flex flex-col justify-between"
                     >
                         <div className="p-3 bg-slate-100 border-b border-slate-200">
-                            <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Choose premium plan">
+                            <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Choose premium plan">
                                 {(Object.keys(PLANS) as PlanType[]).map((type) => {
                                     const plan = PLANS[type];
                                     const isSelected = type === planType;
@@ -371,9 +372,10 @@ export default function PremiumPage() {
                                                 : "text-slate-500 hover:bg-white/70"
                                                 }`}
                                         >
-                                            {type === "YEARLY" && (
-                                                <span className="absolute -top-2 right-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
-                                                    Best Value
+                                            {type !== "MONTHLY" && (
+                                                <span className={`absolute -top-2 right-2 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white ${type === "YEARLY" ? "bg-emerald-500" : "bg-blue-600"
+                                                    }`}>
+                                                    {type === "YEARLY" ? "Best Savings" : "Most Popular"}
                                                 </span>
                                             )}
                                             <span className="block text-xs font-black">{plan.label}</span>
@@ -395,8 +397,13 @@ export default function PremiumPage() {
                                     <span className="text-2xl font-bold line-through text-amber-200">₹{selectedPlan.price}</span>
                                 )}
                                 <span className="text-5xl font-black tracking-tight">₹{finalPrice}</span>
-                                <span className="text-slate-100/80 text-xs font-bold uppercase tracking-wider">/ {planType === "YEARLY" ? "Year" : "Month"}</span>
+                                <span className="text-slate-100/80 text-xs font-bold uppercase tracking-wider">/ {planType === "YEARLY" ? "Year" : planType === "QUARTERLY" ? "90 Days" : "Month"}</span>
                             </div>
+                            {planType === "QUARTERLY" && (
+                                <p className="text-[11px] font-black text-amber-100 mt-1 uppercase tracking-wider">
+                                    Value choice for focused preparation
+                                </p>
+                            )}
                             {planType === "YEARLY" && (
                                 <p className="text-[11px] font-black text-amber-100 mt-1 uppercase tracking-wider">
                                     Save ₹89 vs twelve monthly renewals

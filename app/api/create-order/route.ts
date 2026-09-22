@@ -41,8 +41,8 @@ export async function POST(req: Request) {
         userId: String(userId),
         userName: userName || "Student",
         userEmail: userEmail || "",
-        planType: planType === "YEARLY" ? "YEARLY" : "MONTHLY",
-        validityDays: planType === "YEARLY" ? 365 : validityDays || 30,
+        planType: planType === "QUARTERLY" || planType === "YEARLY" ? planType : "MONTHLY",
+        validityDays: planType === "YEARLY" ? 365 : planType === "QUARTERLY" ? 90 : validityDays || 30,
       },
     };
 

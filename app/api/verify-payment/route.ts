@@ -4,7 +4,12 @@ import { getDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
-const REFERRAL_COMMISSION_INR = 10; // 🎯 दोस्त के सफल पेमेंट पर मिलने वाला कमीशन
+const PLAN_DETAILS = {
+  MONTHLY: { validityDays: 30, commission: 10 },
+  QUARTERLY: { validityDays: 90, commission: 20 },
+  YEARLY: { validityDays: 365, commission: 50 },
+} as const;
+type PlanType = keyof typeof PLAN_DETAILS;
 
 export async function POST(req: Request) {
   try {
@@ -44,8 +49,10 @@ export async function POST(req: Request) {
     // 🎯 SIGNATURE VALID — Process in Database
     const db = getDb();
     const now = new Date();
-    const validityDays = planType === "YEARLY" ? 365 : 30;
-    const savedPlanType = planType === "YEARLY" ? "YEARLY" : "MONTHLY";
+    const savedPlanType: PlanType = planType === "QUARTERLY" || planType === "YEARLY"
+      ? planType
+      : "MONTHLY";
+    const { validityDays, commission } = PLAN_DETAILS[savedPlanType];
     const premiumExpiresAt = new Date(now.getTime() + validityDays * MS_PER_DAY).toISOString();
 
     const buyerRef = db.collection("users").doc(userId);
@@ -67,7 +74,7 @@ export async function POST(req: Request) {
       { merge: true }
     );
 
-    // 2. Process ₹10 Referrer Commission (Only on First Verified Paid Conversion)
+    // 2. Process plan-based referrer commission (Only on First Verified Paid Conversion)
     const codeToReward = (referralCode || buyerData.referredBy || "").trim().toUpperCase();
 
     if (codeToReward && !buyerData.referralRewarded) {
@@ -88,8 +95,8 @@ export async function POST(req: Request) {
           // Atomic credit update to avoid race conditions
           await db.runTransaction(async (transaction) => {
             transaction.update(referrerRef, {
-              walletBalance: FieldValue.increment(REFERRAL_COMMISSION_INR),
-              totalReferralEarnings: FieldValue.increment(REFERRAL_COMMISSION_INR),
+              walletBalance: FieldValue.increment(commission),
+              totalReferralEarnings: FieldValue.increment(commission),
               successfulReferralsCount: FieldValue.increment(1),
               updatedAt: now.toISOString(),
             });
@@ -107,14 +114,14 @@ export async function POST(req: Request) {
               buyerId: userId,
               buyerName: buyerData.name || "Student",
               referralCode: codeToReward,
-              commissionAmount: REFERRAL_COMMISSION_INR,
+              commissionAmount: commission,
               paymentId: razorpay_payment_id,
               orderId: razorpay_order_id,
               createdAt: now.toISOString(),
             });
           });
 
-          console.log(`[Referral Payout] Credited ₹${REFERRAL_COMMISSION_INR} to referrer: ${referrerId}`);
+          console.log(`[Referral Payout] Credited ₹${commission} to referrer: ${referrerId}`);
         }
       }
     }
