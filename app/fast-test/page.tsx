@@ -18,7 +18,7 @@ import {
 import { db, auth } from "@/lib/firebase-client";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { checkTrialStatus } from "@/lib/trial-check";
-import { WARRIOR_CORE_SUBJECTS } from "@/lib/examSubjects";
+import { EXAM_HARD_SUBJECTS } from "@/lib/examSubjects";
 
 type Question = {
   id: string;
@@ -45,7 +45,7 @@ const normalizeExam = (exam: string) => {
   );
 };
 
-// 🎯 CATEGORY MAPPING — group all subject-name variants into just 2 buckets
+// Subject aliases keep older Firestore records compatible with the new map.
 const MATH_VARIANTS = ["mathematics", "quantitative aptitude", "maths", "math"];
 const REASONING_VARIANTS = [
   "reasoning",
@@ -54,7 +54,7 @@ const REASONING_VARIANTS = [
   "logical reasoning",
 ];
 
-function getCategoryForSubject(subject: string): "Math" | "Reasoning" | "Professional Ability" | null {
+function getLegacyCategoryForSubject(subject: string): string | null {
   const s = (subject || "").trim().toLowerCase();
   if (MATH_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Math";
   if (REASONING_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Reasoning";
@@ -184,15 +184,19 @@ export default function FastTestPage() {
         );
 
         const categoryMap: Record<string, Set<string>> = {};
-        const coreSubjects = WARRIOR_CORE_SUBJECTS[targetExam.trim()];
+        const configuredSubjects = EXAM_HARD_SUBJECTS[targetExam.trim()];
+        const configuredSubjectKeys = configuredSubjects
+          ? configuredSubjects.map((subject) => [subject.toLowerCase(), subject] as const)
+          : [];
 
         snap.forEach((d) => {
           const data: any = d.data();
           const rawSubject = data.subject || data.topic || "";
-          if (coreSubjects && !coreSubjects.some((subject) => subject.toLowerCase() === rawSubject.trim().toLowerCase())) {
-            return;
-          }
-          const category = getCategoryForSubject(rawSubject);
+          const normalizedSubject = rawSubject.trim().toLowerCase();
+          const configuredSubject = configuredSubjectKeys.find(([key]) => key === normalizedSubject)?.[1];
+          const category = configuredSubjects
+            ? configuredSubject
+            : getLegacyCategoryForSubject(rawSubject);
           if (!category) return;
 
           if (!categoryMap[category]) categoryMap[category] = new Set();
