@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, Check, RefreshCw, X } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
@@ -16,22 +16,27 @@ export default function InstallPwaBanner() {
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [status, setStatus] = useState<BannerState>("idle");
-    const [currentUser, setCurrentUser] = useState<any>(null);
+    const currentUserRef = useRef<any>(null);
+    const reappearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        const unsub = onAuthStateChanged(auth, (u) => setCurrentUser(u));
+        const unsub = onAuthStateChanged(auth, (u) => {
+            currentUserRef.current = u;
+        });
         return () => unsub();
     }, []);
 
     useEffect(() => {
-        const previouslyInstalled = typeof window !== "undefined" && localStorage.getItem("sonilearn_app_installed") === "true";
-        const dismissed = typeof window !== "undefined" && sessionStorage.getItem("sonilearn_install_dismissed") === "true";
+        const previouslyInstalled = typeof window !== "undefined" && (
+            localStorage.getItem("isAppInstalled") === "true" ||
+            localStorage.getItem("sonilearn_app_installed") === "true"
+        );
         const isStandalone = typeof window !== "undefined" && (
             window.matchMedia("(display-mode: standalone)").matches ||
             (window.navigator as any).standalone === true
         );
 
-        if (previouslyInstalled || isStandalone || dismissed) {
+        if (previouslyInstalled || isStandalone) {
             return;
         }
 
@@ -52,21 +57,24 @@ export default function InstallPwaBanner() {
 
         const handleAppInstalled = async () => {
             setStatus("installed");
-            if (typeof window !== "undefined") {
-                localStorage.setItem("sonilearn_app_installed", "true");
-            }
+            localStorage.setItem("isAppInstalled", "true");
+            localStorage.setItem("sonilearn_app_installed", "true");
             setDeferredPrompt(null);
-            setTimeout(() => setIsVisible(false), 1800);
+            setIsVisible(false);
+            if (reappearTimerRef.current) {
+                clearTimeout(reappearTimerRef.current);
+                reappearTimerRef.current = null;
+            }
 
             try {
                 await fetch("/api/track-install", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        name: currentUser?.displayName || "Guest / Unauthenticated User",
-                        email: currentUser?.email || "No Email Provided",
-                        phone: currentUser?.phoneNumber || "No Phone Provided",
-                        uid: currentUser?.uid || "guest_user",
+                        name: currentUserRef.current?.displayName || "Guest / Unauthenticated User",
+                        email: currentUserRef.current?.email || "No Email Provided",
+                        phone: currentUserRef.current?.phoneNumber || "No Phone Provided",
+                        uid: currentUserRef.current?.uid || "guest_user",
                     }),
                 });
             } catch (err) {
@@ -80,9 +88,12 @@ export default function InstallPwaBanner() {
         return () => {
             window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
             window.removeEventListener("appinstalled", handleAppInstalled);
+            if (reappearTimerRef.current) {
+                clearTimeout(reappearTimerRef.current);
+                reappearTimerRef.current = null;
+            }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentUser]);
+    }, []);
 
     const handleInstallClick = async () => {
         if (status === "installing") return;
@@ -109,9 +120,20 @@ export default function InstallPwaBanner() {
 
     const handleDismiss = () => {
         setIsVisible(false);
-        if (typeof window !== "undefined") {
-            sessionStorage.setItem("sonilearn_install_dismissed", "true");
+        if (reappearTimerRef.current) {
+            clearTimeout(reappearTimerRef.current);
         }
+        reappearTimerRef.current = setTimeout(() => {
+            const isInstalled = localStorage.getItem("isAppInstalled") === "true" ||
+                localStorage.getItem("sonilearn_app_installed") === "true" ||
+                window.matchMedia("(display-mode: standalone)").matches ||
+                (window.navigator as any).standalone === true;
+
+            if (!isInstalled) {
+                setIsVisible(true);
+            }
+            reappearTimerRef.current = null;
+        }, 60000);
     };
 
     if (!isVisible) return null;
