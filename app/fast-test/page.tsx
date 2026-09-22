@@ -18,6 +18,7 @@ import {
 import { db, auth } from "@/lib/firebase-client";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { checkTrialStatus } from "@/lib/trial-check";
+import { WARRIOR_CORE_SUBJECTS } from "@/lib/examSubjects";
 
 type Question = {
   id: string;
@@ -53,10 +54,11 @@ const REASONING_VARIANTS = [
   "logical reasoning",
 ];
 
-function getCategoryForSubject(subject: string): "Math" | "Reasoning" | null {
+function getCategoryForSubject(subject: string): "Math" | "Reasoning" | "Professional Ability" | null {
   const s = (subject || "").trim().toLowerCase();
   if (MATH_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Math";
   if (REASONING_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Reasoning";
+  if (s.includes("professional ability")) return "Professional Ability";
   return null;
 }
 
@@ -182,10 +184,14 @@ export default function FastTestPage() {
         );
 
         const categoryMap: Record<string, Set<string>> = {};
+        const coreSubjects = WARRIOR_CORE_SUBJECTS[targetExam.trim()];
 
         snap.forEach((d) => {
           const data: any = d.data();
           const rawSubject = data.subject || data.topic || "";
+          if (coreSubjects && !coreSubjects.some((subject) => subject.toLowerCase() === rawSubject.trim().toLowerCase())) {
+            return;
+          }
           const category = getCategoryForSubject(rawSubject);
           if (!category) return;
 

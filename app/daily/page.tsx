@@ -31,6 +31,7 @@ import {
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, BookOpen } from "lucide-react";
+import { getSubjectsForExam } from "@/lib/examSubjects";
 
 interface Question {
   id: string;
@@ -211,13 +212,7 @@ export default function DailyChallengePage() {
           if (subj) subjectSet.add(subj);
         });
 
-        const subjectList = Array.from(subjectSet).sort();
-
-        if (subjectList.length === 0) {
-          setError(`No subjects found for ${targetExam}.`);
-          setPhase("result");
-          return;
-        }
+        const subjectList = getSubjectsForExam(targetExam, Array.from(subjectSet).sort());
 
         setAvailableSubjects(subjectList);
         setPhase("subject-select");
@@ -244,7 +239,7 @@ export default function DailyChallengePage() {
 
       const examFilters = normalizeTargetExam(targetExam);
 
-      const snap = await getDocs(
+      let snap = await getDocs(
         query(
           collection(db, "questions"),
           where("exam", "in", examFilters),
@@ -252,6 +247,18 @@ export default function DailyChallengePage() {
           limit(150)
         )
       );
+
+      // If a configured/default subject has no rows yet, use any question
+      // for the exam so the practice flow remains usable.
+      if (snap.empty) {
+        snap = await getDocs(
+          query(
+            collection(db, "questions"),
+            where("exam", "in", examFilters),
+            limit(150)
+          )
+        );
+      }
 
       let arr: Question[] = [];
 
