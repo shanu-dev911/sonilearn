@@ -29,7 +29,7 @@ import {
   CheckCircle2,
   XCircle
 } from "lucide-react";
-import InstallPwaBanner from "@/components/InstallPwaBanner";
+import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePwaBanner from "@/components/UpdatePwaBanner";
 
 interface TestAttempt {
@@ -741,7 +741,7 @@ export default function Dashboard() {
         </footer>
       </main>
 
-      <InstallPwaBanner />
+      <InstallPrompt />
       <UpdatePwaBanner />
     </div>
   );

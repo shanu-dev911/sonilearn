@@ -90,6 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="icon" href="/icon-192x192.png" type="image/png" sizes="192x192" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" sizes="192x192" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
         <FirebaseProvider>
