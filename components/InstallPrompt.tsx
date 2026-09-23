@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
+import { auth } from "@/lib/firebase-client";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -52,7 +53,7 @@ export default function InstallPrompt() {
       }
     };
 
-    const handleAppInstalled = () => {
+    const handleAppInstalled = async () => {
       localStorage.setItem(INSTALL_FLAG, "true");
       localStorage.setItem(LEGACY_INSTALL_FLAG, "true");
       setDeferredPrompt(null);
@@ -60,6 +61,26 @@ export default function InstallPrompt() {
       setShowInstructions(false);
       if (reappearTimerRef.current) clearTimeout(reappearTimerRef.current);
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+
+      try {
+        const currentUser = auth.currentUser;
+        const response = await fetch("/api/track-install", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: currentUser?.displayName || "Guest / Unauthenticated User",
+            email: currentUser?.email || "No Email Provided",
+            phone: currentUser?.phoneNumber || "No Phone Provided",
+            uid: currentUser?.uid || "guest_user",
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("Install notification request failed:", response.status);
+        }
+      } catch (error) {
+        console.error("Install notification failed:", error);
+      }
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);

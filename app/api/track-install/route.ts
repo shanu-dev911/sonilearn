@@ -6,8 +6,8 @@ export async function POST(req: Request) {
         const { name, email, phone, uid } = body;
 
         // 🎯 Reuse the same Telegram bot already used for feedback notifications
-        const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-        const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+        const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN?.trim();
+        const CHAT_ID = process.env.TELEGRAM_CHAT_ID?.trim();
 
         if (!BOT_TOKEN || !CHAT_ID) {
             console.error('Telegram credentials missing on server!');
