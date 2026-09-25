@@ -7,12 +7,17 @@ import { db } from "@/lib/firebase-client";
 import {
   collection,
   doc,
-  setDoc,
   query,
   where,
   getDocs,
+  writeBatch,
 } from "firebase/firestore";
-import { UploadCloud, CheckCircle2, XCircle, Loader2, Eye, Pencil } from "lucide-react";
+import { UploadCloud, CheckCircle2, XCircle, Loader2, Eye, Pencil, FileText, Trash2 } from "lucide-react";
+
+const EXAMS = ["SSC CGL", "SSC CHSL", "SSC MTS", "SSC GD", "SSC CPO", "SSC Stenographer", "SSC JE", "RRB NTPC", "RRB Group D", "RRB ALP", "RRB Technician", "RRB JE", "RRB Paramedical"];
+const SUBJECTS = ["General Awareness", "General Intelligence & Reasoning", "General Science", "Mathematics", "English Comprehension"];
+const SHIFTS = ["Shift 1", "Shift 2", "Shift 3"];
+const YEARS = Array.from({ length: 16 }, (_, index) => 2026 - index);
 
 function shuffleOptions(array: string[]) {
   const arr = [...array];
@@ -40,6 +45,11 @@ export default function BulkUploadPage() {
 
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [targetExam, setTargetExam] = useState(EXAMS[0]);
+  const [examYear, setExamYear] = useState(2026);
+  const [shift, setShift] = useState(SHIFTS[0]);
+  const [subject, setSubject] = useState(SUBJECTS[0]);
+  const [parsingPdf, setParsingPdf] = useState(false);
 
   // 🎯 STEP 1 — PARSE & PREVIEW
   const handlePreview = () => {
@@ -63,6 +73,39 @@ export default function BulkUploadPage() {
     setPreviewMode(true);
   };
 
+  const handlePdfUpload = async (file?: File) => {
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setError("Please select a PDF file.");
+      return;
+    }
+
+    setError("");
+    setDone(false);
+    setParsingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("examCategory", targetExam);
+      formData.append("year", String(examYear));
+      formData.append("shift", shift);
+      formData.append("subject", subject);
+
+      const response = await fetch("/api/admin/parse-pdf", { method: "POST", body: formData });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "PDF parsing failed");
+      if (!Array.isArray(result.questions) || result.questions.length === 0) {
+        throw new Error("No complete questions were found. Please use a selectable-text PDF.");
+      }
+      setParsedQuestions(result.questions);
+      setPreviewMode(true);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "PDF parsing failed.");
+    } finally {
+      setParsingPdf(false);
+    }
+  };
+
   // 🎯 EDIT ANSWER IN PREVIEW
   const handleAnswerChange = (index: number, newAnswer: string) => {
     const updated = [...parsedQuestions];
@@ -77,6 +120,10 @@ export default function BulkUploadPage() {
     setParsedQuestions(updated);
   };
 
+  const handleDeleteQuestion = (index: number) => {
+    setParsedQuestions((questions) => questions.filter((_, questionIndex) => questionIndex !== index));
+  };
+
   // 🎯 STEP 2 — CONFIRM & UPLOAD (after verification)
   const handleConfirmUpload = async () => {
     const questions = parsedQuestions;
@@ -88,81 +135,89 @@ export default function BulkUploadPage() {
     let uploadCount = 0;
     let skipCount = 0;
     let dupCount = 0;
-    let examName = questions[0]?.exam || "";
+    const examName = targetExam;
     setCurrentExamName(examName);
 
     const subjectBatchCounts: Record<string, number> = {};
     const subjectsSeen = new Set<string>();
+    try {
+      const existingSnap = await getDocs(query(collection(db, "questions"), where("examCategory", "==", examName)));
+      const existingQuestions = new Set(existingSnap.docs.map((item) => {
+        const data = item.data() as Record<string, any>;
+        return `${data.year || ""}|${data.shift || ""}|${data.subject || ""}|${data.questionText || data.questionEn || ""}`;
+      }));
+      let pendingWrites: Array<{ reference: ReturnType<typeof doc>; data: Record<string, any> }> = [];
 
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
+      const commitPending = async () => {
+        if (pendingWrites.length === 0) return;
+        const batch = writeBatch(db);
+        pendingWrites.forEach(({ reference, data }) => batch.set(reference, data));
+        await batch.commit();
+        pendingWrites = [];
+      };
 
-      if (!q.questionEn || !q.optionA || !q.optionB || !q.optionC || !q.optionD || !q.answer) {
-        skipCount++;
-        setProgress({ done: i + 1, total: questions.length });
-        continue;
-      }
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i] || {};
+        const questionText = String(q.questionText || q.questionEn || "").trim();
+        const options = Array.isArray(q.options) && q.options.length === 4
+          ? q.options.map((option: unknown) => String(option || "").trim())
+          : [q.optionA, q.optionB, q.optionC, q.optionD].map((option) => String(option || "").trim());
+        const correctOption = String(q.correctOption || q.answer || "A").toUpperCase();
+        const questionSubject = q.subject || subject;
 
-      const subjectKey = q.subject || "Unknown";
-      subjectsSeen.add(subjectKey);
+        if (!questionText || options.some((option: string) => !option) || !["A", "B", "C", "D"].includes(correctOption)) {
+          skipCount++;
+          setProgress({ done: i + 1, total: questions.length });
+          continue;
+        }
 
-      try {
-        const dupQuery = query(
-          collection(db, "questions"),
-          where("exam", "==", q.exam),
-          where("questionEn", "==", q.questionEn)
-        );
-        const dupSnap = await getDocs(dupQuery);
-
-        if (!dupSnap.empty) {
+        const duplicateKey = `${examName}|${examYear}|${shift}|${questionSubject}|${questionText}`;
+        if (existingQuestions.has(`${examYear}|${shift}|${questionSubject}|${questionText}`)) {
           dupCount++;
           setProgress({ done: i + 1, total: questions.length });
           continue;
         }
-      } catch (e) {
-        console.log("Duplicate check error:", e);
-      }
+        existingQuestions.add(`${examYear}|${shift}|${questionSubject}|${questionText}`);
+        subjectsSeen.add(questionSubject);
 
-      let realCorrectAnswerText = "";
-      if (q.answer === "A") realCorrectAnswerText = q.optionA;
-      else if (q.answer === "B") realCorrectAnswerText = q.optionB;
-      else if (q.answer === "C") realCorrectAnswerText = q.optionC;
-      else if (q.answer === "D") realCorrectAnswerText = q.optionD;
-      if (!realCorrectAnswerText) realCorrectAnswerText = q.optionA;
-
-      const optionsPool = [q.optionA, q.optionB, q.optionC, q.optionD];
-      const randomizedOptions = shuffleOptions(optionsPool);
-
-      const sanitized = {
-        ...q,
-        optionA: randomizedOptions[0],
-        optionB: randomizedOptions[1],
-        optionC: randomizedOptions[2],
-        optionD: randomizedOptions[3],
-        answer: "A",
-      };
-
-      if (sanitized.optionA === realCorrectAnswerText) sanitized.answer = "A";
-      else if (sanitized.optionB === realCorrectAnswerText) sanitized.answer = "B";
-      else if (sanitized.optionC === realCorrectAnswerText) sanitized.answer = "C";
-      else if (sanitized.optionD === realCorrectAnswerText) sanitized.answer = "D";
-
-      const uniqueDocId = `q_bulk_${Date.now()}_idx_${i}_${Math.random().toString(36).substr(2, 5)}`;
-      const docRef = doc(db, "questions", uniqueDocId);
-
-      try {
-        await setDoc(docRef, {
-          ...sanitized,
-          createdAt: new Date().toISOString(),
+        const correctText = options["ABCD".indexOf(correctOption)];
+        const legacyOptions = shuffleOptions(options);
+        const legacyAnswer = "ABCD"[legacyOptions.indexOf(correctText)];
+        const reference = doc(collection(db, "questions"));
+        pendingWrites.push({
+          reference,
+          data: {
+            examCategory: examName,
+            exam: examName,
+            year: examYear,
+            shift,
+            subject: questionSubject,
+            questionText,
+            questionEn: questionText,
+            questionHi: q.questionHi || "",
+            options,
+            correctOption,
+            explanation: q.explanation || q.explanationEn || "Explanation pending admin review.",
+            explanationEn: q.explanationEn || q.explanation || "Explanation pending admin review.",
+            explanationHi: q.explanationHi || "व्याख्या की समीक्षा आवश्यक है।",
+            optionA: legacyOptions[0],
+            optionB: legacyOptions[1],
+            optionC: legacyOptions[2],
+            optionD: legacyOptions[3],
+            answer: legacyAnswer,
+            isPYQ: true,
+            createdAt: Date.now(),
+          },
         });
         uploadCount++;
-        subjectBatchCounts[subjectKey] = (subjectBatchCounts[subjectKey] || 0) + 1;
-      } catch (e) {
-        console.log("Upload error for question", i, e);
-        skipCount++;
+        subjectBatchCounts[questionSubject] = (subjectBatchCounts[questionSubject] || 0) + 1;
+        if (pendingWrites.length === 400) await commitPending();
+        setProgress({ done: i + 1, total: questions.length });
       }
-
-      setProgress({ done: i + 1, total: questions.length });
+      await commitPending();
+    } catch (e) {
+      console.error("Batch upload error:", e);
+      setError("Upload failed before all questions were saved. Please try again.");
     }
 
     setSkipped(skipCount);
@@ -170,9 +225,13 @@ export default function BulkUploadPage() {
     setSubjectUploadedThisBatch(subjectBatchCounts);
 
     try {
-      const countQuery = query(collection(db, "questions"), where("exam", "==", examName));
+      const countQuery = query(collection(db, "questions"), where("examCategory", "==", examName));
       const countSnap = await getDocs(countQuery);
-      setCurrentExamCount(countSnap.size);
+      const currentBucketCount = countSnap.docs.filter((item) => {
+        const data = item.data() as Record<string, any>;
+        return Number(data.year) === examYear && data.shift === shift && data.subject === subject;
+      }).length;
+      setCurrentExamCount(currentBucketCount);
     } catch (e) {
       console.log("Count fetch error:", e);
     }
@@ -234,8 +293,11 @@ export default function BulkUploadPage() {
                 </div>
 
                 <textarea
-                  value={q.questionEn || ""}
-                  onChange={(e) => handleFieldChange(index, "questionEn", e.target.value)}
+                  value={q.questionText || q.questionEn || ""}
+                  onChange={(e) => {
+                    handleFieldChange(index, "questionText", e.target.value);
+                    handleFieldChange(index, "questionEn", e.target.value);
+                  }}
                   rows={2}
                   className="w-full text-sm font-semibold text-slate-800 border border-slate-200 rounded-xl p-2.5 mb-3 outline-none focus:border-blue-400 resize-none"
                 />
@@ -278,7 +340,31 @@ export default function BulkUploadPage() {
                     <option value="C">C</option>
                     <option value="D">D</option>
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteQuestion(index)}
+                    className="ml-auto inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
                 </div>
+                <textarea
+                  value={q.explanation || q.explanationEn || ""}
+                  onChange={(e) => {
+                    handleFieldChange(index, "explanation", e.target.value);
+                    handleFieldChange(index, "explanationEn", e.target.value);
+                  }}
+                  rows={2}
+                  placeholder="English explanation"
+                  className="mt-3 w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs text-slate-700 outline-none focus:border-blue-400"
+                />
+                <textarea
+                  value={q.explanationHi || ""}
+                  onChange={(e) => handleFieldChange(index, "explanationHi", e.target.value)}
+                  rows={2}
+                  placeholder="Hindi explanation"
+                  className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs text-slate-700 outline-none focus:border-blue-400"
+                />
               </div>
             ))}
           </div>
@@ -309,7 +395,43 @@ export default function BulkUploadPage() {
     <div className="min-h-screen bg-slate-50 py-10 px-4">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-black text-slate-900 mb-1">📤 Bulk Question Upload</h1>
-        <p className="text-slate-500 text-sm mb-6">JSON array paste karo neeche, aur Preview dabao verify karne ke liye.</p>
+        <p className="text-slate-500 text-sm mb-6">Select metadata, upload a PDF, review every extracted question, then save safely to Firestore.</p>
+
+        <div className="mb-6 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2">
+          {[
+            ["Target Exam", targetExam, setTargetExam, EXAMS],
+            ["Exam Year", examYear, (value: string) => setExamYear(Number(value)), YEARS],
+            ["Shift", shift, setShift, SHIFTS],
+            ["Subject", subject, setSubject, SUBJECTS],
+          ].map(([label, value, setter, options]) => (
+            <label key={String(label)} className="text-xs font-black uppercase tracking-wide text-slate-500">
+              {String(label)}
+              <select
+                value={String(value)}
+                onChange={(event) => (setter as (value: string) => void)(event.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none focus:border-blue-500"
+              >
+                {(options as (string | number)[]).map((option) => <option key={String(option)} value={String(option)}>{option}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+
+        <label
+          htmlFor="pdf-upload"
+          className={`mb-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 px-6 py-8 text-center transition hover:border-blue-500 hover:bg-blue-50 ${parsingPdf ? "pointer-events-none opacity-60" : ""}`}
+        >
+          {parsingPdf ? <Loader2 size={28} className="animate-spin text-blue-600" /> : <FileText size={28} className="text-blue-600" />}
+          <span className="mt-2 text-sm font-black text-slate-800">{parsingPdf ? "Parsing PDF..." : "Drop PDF here or choose a file"}</span>
+          <span className="mt-1 text-xs text-slate-500">Question text, options, answers, and explanations will be previewed before saving.</span>
+          <input id="pdf-upload" type="file" accept="application/pdf,.pdf" className="hidden" onChange={(event) => handlePdfUpload(event.target.files?.[0])} disabled={parsingPdf || uploading} />
+        </label>
+
+        {error && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+            <XCircle size={16} /> {error}
+          </div>
+        )}
 
         <textarea
           value={jsonInput}
