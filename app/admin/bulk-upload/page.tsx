@@ -98,8 +98,20 @@ export default function BulkUploadPage() {
       formData.append("subject", subject);
 
       const response = await fetch("/api/admin/parse-pdf", { method: "POST", body: formData });
-      const result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.error || "PDF parsing failed");
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${responseText.slice(0, 100)}`);
+      }
+
+      let result: { success?: boolean; error?: string; questions?: any[]; metadata?: any };
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Server returned a non-JSON response: ${responseText.slice(0, 100)}`);
+      }
+
+      if (!result.success) throw new Error(result.error || "PDF parsing failed");
       if (!Array.isArray(result.questions) || result.questions.length === 0) {
         throw new Error("No complete questions were found. Please use a selectable-text PDF.");
       }
