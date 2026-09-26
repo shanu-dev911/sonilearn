@@ -50,6 +50,12 @@ export default function BulkUploadPage() {
   const [shift, setShift] = useState(SHIFTS[0]);
   const [subject, setSubject] = useState(SUBJECTS[0]);
   const [parsingPdf, setParsingPdf] = useState(false);
+  const [resolvedMetadata, setResolvedMetadata] = useState({
+    examCategory: EXAMS[0],
+    year: 2026,
+    shift: SHIFTS[0],
+    subject: SUBJECTS[0],
+  });
 
   // 🎯 STEP 1 — PARSE & PREVIEW
   const handlePreview = () => {
@@ -97,7 +103,21 @@ export default function BulkUploadPage() {
       if (!Array.isArray(result.questions) || result.questions.length === 0) {
         throw new Error("No complete questions were found. Please use a selectable-text PDF.");
       }
-      setParsedQuestions(result.questions);
+      const metadata = result.metadata || {
+        examCategory: targetExam,
+        year: examYear,
+        shift,
+        subject,
+      };
+      setResolvedMetadata(metadata);
+      setParsedQuestions(result.questions.map((question: Record<string, any>) => ({
+        ...question,
+        examCategory: question.examCategory || metadata.examCategory,
+        exam: question.exam || metadata.examCategory,
+        year: question.year || metadata.year,
+        shift: question.shift || metadata.shift,
+        subject: question.subject || metadata.subject,
+      })));
       setPreviewMode(true);
     } catch (error) {
       setError(error instanceof Error ? error.message : "PDF parsing failed.");
@@ -109,7 +129,7 @@ export default function BulkUploadPage() {
   // 🎯 EDIT ANSWER IN PREVIEW
   const handleAnswerChange = (index: number, newAnswer: string) => {
     const updated = [...parsedQuestions];
-    updated[index] = { ...updated[index], answer: newAnswer };
+    updated[index] = { ...updated[index], answer: newAnswer, correctOption: newAnswer };
     setParsedQuestions(updated);
   };
 
@@ -117,6 +137,9 @@ export default function BulkUploadPage() {
   const handleFieldChange = (index: number, field: string, value: string) => {
     const updated = [...parsedQuestions];
     updated[index] = { ...updated[index], [field]: value };
+    if (field.startsWith("option") && updated[index].options) {
+      updated[index].options = ["A", "B", "C", "D"].map((letter) => updated[index][`option${letter}`] || "");
+    }
     setParsedQuestions(updated);
   };
 
@@ -135,7 +158,10 @@ export default function BulkUploadPage() {
     let uploadCount = 0;
     let skipCount = 0;
     let dupCount = 0;
-    const examName = targetExam;
+    const examName = resolvedMetadata.examCategory;
+    const uploadYear = resolvedMetadata.year;
+    const uploadShift = resolvedMetadata.shift;
+    const uploadSubject = resolvedMetadata.subject;
     setCurrentExamName(examName);
 
     const subjectBatchCounts: Record<string, number> = {};
@@ -162,8 +188,8 @@ export default function BulkUploadPage() {
         const options = Array.isArray(q.options) && q.options.length === 4
           ? q.options.map((option: unknown) => String(option || "").trim())
           : [q.optionA, q.optionB, q.optionC, q.optionD].map((option) => String(option || "").trim());
-        const correctOption = String(q.correctOption || q.answer || "A").toUpperCase();
-        const questionSubject = q.subject || subject;
+        const correctOption = String(q.correctOption || q.answer || "").toUpperCase();
+        const questionSubject = q.subject || uploadSubject;
 
         if (!questionText || options.some((option: string) => !option) || !["A", "B", "C", "D"].includes(correctOption)) {
           skipCount++;
@@ -171,13 +197,15 @@ export default function BulkUploadPage() {
           continue;
         }
 
-        const duplicateKey = `${examName}|${examYear}|${shift}|${questionSubject}|${questionText}`;
-        if (existingQuestions.has(`${examYear}|${shift}|${questionSubject}|${questionText}`)) {
+        const questionYear = Number(q.year || uploadYear);
+        const questionShift = q.shift || uploadShift;
+        const duplicateKey = `${examName}|${questionYear}|${questionShift}|${questionSubject}|${questionText}`;
+        if (existingQuestions.has(`${questionYear}|${questionShift}|${questionSubject}|${questionText}`)) {
           dupCount++;
           setProgress({ done: i + 1, total: questions.length });
           continue;
         }
-        existingQuestions.add(`${examYear}|${shift}|${questionSubject}|${questionText}`);
+        existingQuestions.add(`${questionYear}|${questionShift}|${questionSubject}|${questionText}`);
         subjectsSeen.add(questionSubject);
 
         const correctText = options["ABCD".indexOf(correctOption)];
@@ -189,17 +217,17 @@ export default function BulkUploadPage() {
           data: {
             examCategory: examName,
             exam: examName,
-            year: examYear,
-            shift,
+            year: questionYear,
+            shift: questionShift,
             subject: questionSubject,
             questionText,
             questionEn: questionText,
             questionHi: q.questionHi || "",
             options,
             correctOption,
-            explanation: q.explanation || q.explanationEn || "Explanation pending admin review.",
-            explanationEn: q.explanationEn || q.explanation || "Explanation pending admin review.",
-            explanationHi: q.explanationHi || "व्याख्या की समीक्षा आवश्यक है।",
+            explanation: q.explanation || q.explanationEn || "",
+            explanationEn: q.explanationEn || q.explanation || "",
+            explanationHi: q.explanationHi || "",
             optionA: legacyOptions[0],
             optionB: legacyOptions[1],
             optionC: legacyOptions[2],
@@ -229,7 +257,7 @@ export default function BulkUploadPage() {
       const countSnap = await getDocs(countQuery);
       const currentBucketCount = countSnap.docs.filter((item) => {
         const data = item.data() as Record<string, any>;
-        return Number(data.year) === examYear && data.shift === shift && data.subject === subject;
+        return Number(data.year) === uploadYear && data.shift === uploadShift && data.subject === uploadSubject;
       }).length;
       setCurrentExamCount(currentBucketCount);
     } catch (e) {
@@ -279,6 +307,12 @@ export default function BulkUploadPage() {
           <p className="text-slate-500 text-sm mb-6">
             {parsedQuestions.length} questions mile. Answer galat lage to niche se badal do, phir Confirm & Upload dabao.
           </p>
+          <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs sm:grid-cols-4">
+            <div><span className="block font-bold uppercase tracking-wide text-blue-500">Exam</span><span className="font-black text-slate-800">{resolvedMetadata.examCategory}</span></div>
+            <div><span className="block font-bold uppercase tracking-wide text-blue-500">Year</span><span className="font-black text-slate-800">{resolvedMetadata.year}</span></div>
+            <div><span className="block font-bold uppercase tracking-wide text-blue-500">Shift</span><span className="font-black text-slate-800">{resolvedMetadata.shift}</span></div>
+            <div><span className="block font-bold uppercase tracking-wide text-blue-500">Subject</span><span className="font-black text-slate-800">{resolvedMetadata.subject}</span></div>
+          </div>
 
           <div className="space-y-4 mb-6">
             {parsedQuestions.map((q, index) => (
@@ -331,10 +365,11 @@ export default function BulkUploadPage() {
                     <Pencil size={12} /> Correct Answer:
                   </label>
                   <select
-                    value={q.answer || "A"}
+                    value={q.answer || ""}
                     onChange={(e) => handleAnswerChange(index, e.target.value)}
                     className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer"
                   >
+                    <option value="">Select answer</option>
                     <option value="A">A</option>
                     <option value="B">B</option>
                     <option value="C">C</option>

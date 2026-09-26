@@ -18,7 +18,7 @@ import {
 import { db, auth } from "@/lib/firebase-client";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { checkTrialStatus } from "@/lib/trial-check";
-import { EXAM_HARD_SUBJECTS } from "@/lib/examSubjects";
+import { EXAM_WARRIOR_SUBJECTS } from "@/lib/examSubjects";
 
 type Question = {
   id: string;
@@ -44,23 +44,6 @@ const normalizeExam = (exam: string) => {
     new Set([cleaned, underscored, underscored.toUpperCase(), underscored.toLowerCase()])
   );
 };
-
-// Subject aliases keep older Firestore records compatible with the new map.
-const MATH_VARIANTS = ["mathematics", "quantitative aptitude", "maths", "math"];
-const REASONING_VARIANTS = [
-  "reasoning",
-  "general intelligence and reasoning",
-  "general intelligence & reasoning",
-  "logical reasoning",
-];
-
-function getLegacyCategoryForSubject(subject: string): string | null {
-  const s = (subject || "").trim().toLowerCase();
-  if (MATH_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Math";
-  if (REASONING_VARIANTS.some((v) => s.includes(v) || v.includes(s))) return "Reasoning";
-  if (s.includes("professional ability")) return "Professional Ability";
-  return null;
-}
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -109,8 +92,7 @@ export default function FastTestPage() {
   const [targetExam, setTargetExam] = useState("");
   const [error, setError] = useState("");
 
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-  const [categorySubjectsMap, setCategorySubjectsMap] = useState<Record<string, string[]>>({});
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("");
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -166,7 +148,7 @@ export default function FastTestPage() {
     return () => unsub();
   }, [user, authLoading]);
 
-  // STEP 1 — FIND AVAILABLE MATH/REASONING CATEGORIES FOR THIS EXAM (hard only)
+  // STEP 1 — FIND THE TWO HARDEST SUBJECTS FOR THIS EXAM
   useEffect(() => {
     if (!targetExam) return;
 
@@ -178,46 +160,34 @@ export default function FastTestPage() {
         const snap = await getDocs(
           query(
             collection(db, "questions"),
-            where("exam", "in", examFilters),
-            where("difficulty", "==", "hard")
+            where("examCategory", "==", targetExam),
+            where("difficulty", "==", "Hard")
           )
         );
 
-        const categoryMap: Record<string, Set<string>> = {};
-        const configuredSubjects = EXAM_HARD_SUBJECTS[targetExam.trim()];
-        const configuredSubjectKeys = configuredSubjects
-          ? configuredSubjects.map((subject) => [subject.toLowerCase(), subject] as const)
-          : [];
+        const configuredSubjects = EXAM_WARRIOR_SUBJECTS[targetExam.trim()];
+        let targetHardSubjects: string[] = configuredSubjects ? [...configuredSubjects] : [];
 
+        const subjectDifficultyCounts: Record<string, number> = {};
         snap.forEach((d) => {
-          const data: any = d.data();
-          const rawSubject = data.subject || data.topic || "";
-          const normalizedSubject = rawSubject.trim().toLowerCase();
-          const configuredSubject = configuredSubjectKeys.find(([key]) => key === normalizedSubject)?.[1];
-          const category = configuredSubjects
-            ? configuredSubject
-            : getLegacyCategoryForSubject(rawSubject);
-          if (!category) return;
-
-          if (!categoryMap[category]) categoryMap[category] = new Set();
-          categoryMap[category].add(rawSubject);
+          const rawSubject = String((d.data() as any)?.subject || "").trim();
+          if (rawSubject) subjectDifficultyCounts[rawSubject] = (subjectDifficultyCounts[rawSubject] || 0) + 1;
         });
 
-        const categories = Object.keys(categoryMap).sort();
+        if (targetHardSubjects.length === 0) {
+          targetHardSubjects = Object.entries(subjectDifficultyCounts)
+            .sort(([, firstCount], [, secondCount]) => secondCount - firstCount)
+            .slice(0, 2)
+            .map(([subject]) => subject);
+        }
 
-        if (categories.length === 0) {
-          setError(`No Warrior (Hard Math/Reasoning) questions available yet for ${targetExam}.`);
+        if (targetHardSubjects.length === 0) {
+          setError(`No Warrior questions available yet for ${targetExam}.`);
           setPhase("result");
           return;
         }
 
-        const subjectsMap: Record<string, string[]> = {};
-        Object.entries(categoryMap).forEach(([cat, subjectSet]) => {
-          subjectsMap[cat] = Array.from(subjectSet);
-        });
-
-        setAvailableCategories(categories);
-        setCategorySubjectsMap(subjectsMap);
+        setAvailableSubjects(targetHardSubjects);
         setPhase("subject-select");
       } catch (err) {
         console.error(err);
@@ -241,15 +211,14 @@ export default function FastTestPage() {
       setTimeLeft(TIMER_SECONDS);
       setScore(0);
 
-      const examFilters = normalizeExam(targetExam);
-      const rawSubjectVariants = categorySubjectsMap[category] || [category];
+      const targetHardSubjects = EXAM_WARRIOR_SUBJECTS[targetExam.trim()] || availableSubjects.slice(0, 2);
 
       const snap = await getDocs(
         query(
           collection(db, "questions"),
-          where("exam", "in", examFilters),
-          where("subject", "in", rawSubjectVariants),
-          where("difficulty", "==", "hard")
+          where("examCategory", "==", targetExam),
+          where("subject", "in", targetHardSubjects),
+          where("difficulty", "==", "Hard")
         )
       );
 
@@ -300,7 +269,7 @@ export default function FastTestPage() {
       arr = arr.sort(() => Math.random() - 0.5).slice(0, TOTAL_QUESTIONS);
 
       if (arr.length === 0) {
-        setError(`No verified hard questions found for ${category}.`);
+        setError(`No Warrior questions available yet for ${targetExam}.`);
         setPhase("result");
         return;
       }
@@ -467,13 +436,13 @@ export default function FastTestPage() {
         </header>
 
         <div className="max-w-2xl mx-auto px-4 mt-8">
-          <h2 className="text-xl font-black text-slate-900 mb-1">Choose Math or Reasoning</h2>
+          <h2 className="text-xl font-black text-slate-900 mb-1">Warrior Arena: Top 2 Challenging Subjects</h2>
           <p className="text-slate-500 text-sm mb-6">
-            30 hard-level questions, 30 minutes. Only verified questions shown.
+            Aapke is exam ke 2 sabse hard subjects ke verified questions yahan milenge.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {availableCategories.map((category) => (
+            {availableSubjects.map((category) => (
               <button
                 key={category}
                 onClick={() => startQuizForSubject(category)}
