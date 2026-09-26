@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { PDFParse } from "pdf-parse";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
 
 const SUPPORTED_EXAMS = [
   "SSC CGL", "SSC CHSL", "SSC MTS", "SSC GD", "SSC CPO", "SSC Stenographer", "SSC JE",
@@ -85,16 +87,25 @@ export async function POST(request: Request) {
     const shift = String(formData.get("shift") || "");
     const subject = String(formData.get("subject") || "");
 
-    if (!(file instanceof File) || file.type !== "application/pdf") {
+    if (!(file instanceof File) || (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf"))) {
       return NextResponse.json({ success: false, error: "Please upload a PDF file." }, { status: 400 });
+    }
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      return NextResponse.json({ success: false, error: "PDF is too large. Maximum upload size is 10 MB." }, { status: 413 });
     }
     if (!SUPPORTED_EXAMS.includes(examCategory) || !SUPPORTED_SUBJECTS.includes(subject) || !["Shift 1", "Shift 2", "Shift 3"].includes(shift) || year < 2011 || year > 2026) {
       return NextResponse.json({ success: false, error: "Invalid exam metadata." }, { status: 400 });
     }
 
+    const { PDFParse } = await import("pdf-parse");
     const buffer = Buffer.from(await file.arrayBuffer());
     const parser = new PDFParse({ data: buffer });
-    const parsed = await parser.getText();
+    let parsed;
+    try {
+      parsed = await parser.getText();
+    } finally {
+      await parser.destroy();
+    }
     const resolvedMetadata = findMetadata(parsed.text, { examCategory, year, shift, subject });
     const questions = parseQuestions(parsed.text).map((question) => ({
       ...question,
@@ -105,6 +116,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, metadata: resolvedMetadata, questions, total: questions.length });
   } catch (error) {
     console.error("PDF parse error:", error);
-    return NextResponse.json({ success: false, error: "Unable to parse this PDF. Please check that it contains selectable text." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Unknown PDF parsing error";
+    return NextResponse.json({ success: false, error: `Unable to parse PDF: ${message}` }, { status: 500 });
   }
 }
