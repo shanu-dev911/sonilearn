@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import pdf from "pdf-parse";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -97,17 +98,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Invalid exam metadata." }, { status: 400 });
     }
 
-    const { PDFParse } = await import("pdf-parse");
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const parser = new PDFParse({ data: buffer });
-    let parsed;
-    try {
-      parsed = await parser.getText();
-    } finally {
-      await parser.destroy();
-    }
-    const resolvedMetadata = findMetadata(parsed.text, { examCategory, year, shift, subject });
-    const questions = parseQuestions(parsed.text).map((question) => ({
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const data = await pdf(buffer);
+    const rawText = data.text || "";
+    const resolvedMetadata = findMetadata(rawText, { examCategory, year, shift, subject });
+    const questions = parseQuestions(rawText).map((question) => ({
       ...question,
       ...resolvedMetadata,
       exam: resolvedMetadata.examCategory,
