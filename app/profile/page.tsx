@@ -89,9 +89,12 @@ const MULTI_STAGE_EXAMS: Record<string, StageConfigEntry> = {
 const MIN_WITHDRAWAL_INR = 100;
 const REFERRAL_DISCOUNT_PERCENT = 10;
 const REFERRAL_PLANS = [
-    { price: 129, validity: "90 दिन" },
-    { price: 499, validity: "1 साल" },
+    { price: 49, validity: "मंथली", reward: 10 },
+    { price: 129, validity: "90 दिन", reward: 20 },
+    { price: 499, validity: "1 साल", reward: 25 },
 ] as const;
+
+const MAX_REFERRAL_REWARD = Math.max(...REFERRAL_PLANS.map((p) => p.reward));
 const discountedReferralPrice = (price: number) => Math.round(price * (1 - REFERRAL_DISCOUNT_PERCENT / 100));
 
 function generateReferralCode(name: string): string {
@@ -248,9 +251,11 @@ export default function ProfilePage() {
         return (
             `🎯 *SoniLearn - SSC & Railway Mock Tests*\n\n` +
             `SSC और Railway परीक्षाओं की तैयारी के लिए SoniLearn ऐप इस्तेमाल करें। यहाँ TCS पैटर्न के PYQ और रियल टाइम ऑल इंडिया टेस्ट उपलब्ध हैं।\n\n` +
-                `🎁 मेरा कूपन कोड इस्तेमाल करके प्रीमियम पास पर ${REFERRAL_DISCOUNT_PERCENT}% की छूट पाएं!\n` +
-                `₹${REFERRAL_PLANS[0].price} वाला ${REFERRAL_PLANS[0].validity} पास ₹${discountedReferralPrice(REFERRAL_PLANS[0].price)} में, या ₹${REFERRAL_PLANS[1].price} वाला ${REFERRAL_PLANS[1].validity} पास ₹${discountedReferralPrice(REFERRAL_PLANS[1].price)} में पाएं।\n\n` +
-                `👉 कूपन कोड: *${code}*\n` +
+            `🎁 मेरा कूपन कोड इस्तेमाल करके प्रीमियम पास पर ${REFERRAL_DISCOUNT_PERCENT}% की सीधी छूट पाएं!\n` +
+            `• ₹${REFERRAL_PLANS[0].price} वाला पास मात्र ₹${discountedReferralPrice(REFERRAL_PLANS[0].price)} में\n` +
+            `• ₹${REFERRAL_PLANS[1].price} वाला ${REFERRAL_PLANS[1].validity} पास मात्र ₹${discountedReferralPrice(REFERRAL_PLANS[1].price)} में\n` +
+            `• ₹${REFERRAL_PLANS[2].price} वाला ${REFERRAL_PLANS[2].validity} पास मात्र ₹${discountedReferralPrice(REFERRAL_PLANS[2].price)} में\n\n` +
+            `👉 कूपन कोड: *${code}*\n` +
             `📲 वेबसाइट पर जाएं: https://sonilearn.in`
         );
     };
@@ -385,7 +390,7 @@ export default function ProfilePage() {
                                 </div>
                                 <div>
                                     <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                                        Refer & Earn ₹10 Cash
+                                        Refer & Earn up to ₹{MAX_REFERRAL_REWARD} Cash
                                     </h3>
                                     <p className="text-[11px] text-slate-500 font-medium">
                                         Per successful pass purchase
@@ -421,7 +426,7 @@ export default function ProfilePage() {
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-900">दोस्त को 10% की छूट मिलेगी</h4>
                                     <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
-                                        जब वह ₹{REFERRAL_PLANS[0].price} ({REFERRAL_PLANS[0].validity}) या ₹{REFERRAL_PLANS[1].price} ({REFERRAL_PLANS[1].validity}) का प्रीमियम पास खरीदेगा, तो आपका कोड लगाने पर उसे 10% की छूट मिलेगी (पास ₹{discountedReferralPrice(REFERRAL_PLANS[0].price)} या ₹{discountedReferralPrice(REFERRAL_PLANS[1].price)} में मिलेगा)।
+                                        जब वह ₹49, ₹129 (90 दिन) या ₹499 (1 साल) का प्रीमियम पास खरीदेगा, तो आपका कोड लगाने पर उसे 10% की छूट मिलेगी (पास ₹44, ₹116 या ₹449 में मिलेगा)।
                                     </p>
                                 </div>
                             </div>
@@ -431,9 +436,9 @@ export default function ProfilePage() {
                                     3
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-emerald-950">आपको ₹10 का सीधा कैश!</h4>
+                                    <h4 className="text-xs font-bold text-emerald-950">आपको सीधा कैश मिलेगा!</h4>
                                     <p className="text-[11px] text-emerald-800 leading-relaxed mt-0.5">
-                                        पेमेंट सफल होते ही आपके वॉलेट में ₹10 जुड़ जाएँगे। ₹100 होते ही आप UPI से सीधे निकाल सकते हैं।
+                                        दोस्त के पास खरीदते ही आपके वॉलेट में सीधा कैश जुड़ेगा: ₹49 पर ₹10, ₹129 पर ₹20 और ₹499 पर ₹25! ₹100 होते ही UPI से तुरंत निकाल सकते हैं।
                                     </p>
                                 </div>
                             </div>
@@ -530,7 +535,7 @@ export default function ProfilePage() {
                                             Referral Wallet
                                         </h3>
                                         <p className="text-slate-400 text-xs font-medium">
-                                            Earn ₹10 on every friend's pass purchase
+                                            Earn up to ₹{MAX_REFERRAL_REWARD} on every friend's pass purchase
                                         </p>
                                     </div>
                                 </div>
@@ -555,7 +560,7 @@ export default function ProfilePage() {
                                 <p className="text-[11px] text-slate-400 font-medium mt-2">
                                     {walletBalance >= MIN_WITHDRAWAL_INR
                                         ? "🎉 बधाई! आपका बैलेंस ₹100 पार हो गया है। नीचे अपनी UPI ID डालकर तुरंत विथड्रॉ करें।"
-                                        : `विथड्रॉ अनलॉक करने के लिए ₹${MIN_WITHDRAWAL_INR - walletBalance} और चाहिए (लगभग ${Math.ceil((MIN_WITHDRAWAL_INR - walletBalance) / 10)} सफल रेफरल)।`}
+                                        : `विथड्रॉ अनलॉक करने के लिए ₹${MIN_WITHDRAWAL_INR - walletBalance} और चाहिए।`}
                                 </p>
                             </div>
 
@@ -722,11 +727,11 @@ export default function ProfilePage() {
                                                 Share & Earn Cash
                                             </span>
                                             <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
-                                                ₹10 Payout
+                                                Up to ₹{MAX_REFERRAL_REWARD} Payout
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                            दोस्त को 10% की छूट और आपको ₹10 का सीधा UPI कैश मिलेगा।
+                                            दोस्त को हर पास पर 10% छूट, और आपको ₹10, ₹20 या ₹25 तक का सीधा कैश।
                                         </p>
                                     </div>
                                 </div>
