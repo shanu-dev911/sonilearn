@@ -87,6 +87,12 @@ const MULTI_STAGE_EXAMS: Record<string, StageConfigEntry> = {
 };
 
 const MIN_WITHDRAWAL_INR = 100;
+const REFERRAL_DISCOUNT_PERCENT = 10;
+const REFERRAL_PLANS = [
+    { price: 129, validity: "90 दिन" },
+    { price: 499, validity: "1 साल" },
+] as const;
+const discountedReferralPrice = (price: number) => Math.round(price * (1 - REFERRAL_DISCOUNT_PERCENT / 100));
 
 function generateReferralCode(name: string): string {
     const cleanName = (name || "SL").replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 3) || "SL";
@@ -242,7 +248,8 @@ export default function ProfilePage() {
         return (
             `🎯 *SoniLearn - SSC & Railway Mock Tests*\n\n` +
             `SSC और Railway परीक्षाओं की तैयारी के लिए SoniLearn ऐप इस्तेमाल करें। यहाँ TCS पैटर्न के PYQ और रियल टाइम ऑल इंडिया टेस्ट उपलब्ध हैं।\n\n` +
-                `🎁 मेरा कूपन कोड इस्तेमाल करके प्रीमियम पास पर तुरंत 10% की छूट पाएं!\n\n` +
+                `🎁 मेरा कूपन कोड इस्तेमाल करके प्रीमियम पास पर ${REFERRAL_DISCOUNT_PERCENT}% की छूट पाएं!\n` +
+                `₹${REFERRAL_PLANS[0].price} वाला ${REFERRAL_PLANS[0].validity} पास ₹${discountedReferralPrice(REFERRAL_PLANS[0].price)} में, या ₹${REFERRAL_PLANS[1].price} वाला ${REFERRAL_PLANS[1].validity} पास ₹${discountedReferralPrice(REFERRAL_PLANS[1].price)} में पाएं।\n\n` +
                 `👉 कूपन कोड: *${code}*\n` +
             `📲 वेबसाइट पर जाएं: https://sonilearn.in`
         );
@@ -414,7 +421,7 @@ export default function ProfilePage() {
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-900">दोस्त को 10% की छूट मिलेगी</h4>
                                     <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
-                                        जब वह ₹49 का प्रीमियम पास खरीदेगा, तो आपका कोड लगाने पर उसे पास सिर्फ ₹44 में मिलेगा।
+                                        जब वह ₹{REFERRAL_PLANS[0].price} ({REFERRAL_PLANS[0].validity}) या ₹{REFERRAL_PLANS[1].price} ({REFERRAL_PLANS[1].validity}) का प्रीमियम पास खरीदेगा, तो आपका कोड लगाने पर उसे 10% की छूट मिलेगी (पास ₹{discountedReferralPrice(REFERRAL_PLANS[0].price)} या ₹{discountedReferralPrice(REFERRAL_PLANS[1].price)} में मिलेगा)।
                                     </p>
                                 </div>
                             </div>
