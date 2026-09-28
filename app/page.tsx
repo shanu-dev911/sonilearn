@@ -372,31 +372,30 @@ export default function Dashboard() {
               </div>
 
               {!isPremium && (
-                <button
-                  onClick={() => router.push("/premium")}
+                <Link
+                  href="/premium"
+                  prefetch={true}
                   className="relative group overflow-hidden flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-900 text-white text-[10px] sm:text-xs font-semibold hover:bg-slate-800 transition-all duration-300 shadow-md active:scale-95 whitespace-nowrap"
                 >
                   <Rocket size={11} className="text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform hidden sm:inline" />
                   <span>Upgrade</span>
-                </button>
+                </Link>
               )}
 
-                <Link
-                  href="/premium"
-                  prefetch={true}
-                className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 hover:bg-slate-200/80 text-slate-600 rounded-xl flex items-center justify-center text-xs sm:text-sm transition-all duration-200 active:scale-95 border border-slate-200/60 flex-shrink-0"
-              >
-                👤
-              </button>
-                </Link>
-          </div>
               <Link
                 href="/profile"
                 prefetch={true}
+                className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 hover:bg-slate-200/80 text-slate-600 rounded-xl flex items-center justify-center text-xs sm:text-sm transition-all duration-200 active:scale-95 border border-slate-200/60 flex-shrink-0"
+              >
+                👤
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
 
       {/* CONTAINER CONTROL */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
-              </Link>
         {/* TRIAL BANNERS */}
         {!isPremium && trialStatus && trialStatus.isTrialActive && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
