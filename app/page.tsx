@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from "react";
 import loadClientComponent from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
@@ -82,7 +83,7 @@ export default function Dashboard() {
         setUserName(currentUser.displayName || "Student");
       }
 
-      await fetchUserTestHistory(currentUser.uid);
+      void fetchUserTestHistory(currentUser.uid);
     } catch (error) {
       console.error("Error fetching user data:", error);
     }
@@ -152,10 +153,10 @@ export default function Dashboard() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        await fetchUserDocument(user);
         setLoadingUserData(false);
+        void fetchUserDocument(user);
       } else {
-        router.push("/login");
+        router.replace("/login");
       }
     });
 
@@ -380,32 +381,35 @@ export default function Dashboard() {
                 </button>
               )}
 
-              <button
-                onClick={() => router.push("/profile")}
+                <Link
+                  href="/premium"
+                  prefetch={true}
                 className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 hover:bg-slate-200/80 text-slate-600 rounded-xl flex items-center justify-center text-xs sm:text-sm transition-all duration-200 active:scale-95 border border-slate-200/60 flex-shrink-0"
               >
                 👤
               </button>
-            </div>
+                </Link>
           </div>
-        </div>
-      </header>
+              <Link
+                href="/profile"
+                prefetch={true}
 
       {/* CONTAINER CONTROL */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
-
+              </Link>
         {/* TRIAL BANNERS */}
         {!isPremium && trialStatus && trialStatus.isTrialActive && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
             <p className="text-blue-700 text-xs sm:text-sm font-bold">
               🎁 {trialStatus.daysRemaining} day{trialStatus.daysRemaining !== 1 ? "s" : ""} left in your free trial
             </p>
-            <button
-              onClick={() => router.push("/premium")}
+            <Link
+              href="/premium"
+              prefetch={true}
               className="text-blue-600 text-xs font-black underline flex-shrink-0"
             >
               Upgrade Now
-            </button>
+            </Link>
           </div>
         )}
 
@@ -414,12 +418,13 @@ export default function Dashboard() {
             <p className="text-rose-700 text-xs sm:text-sm font-bold">
               ⏰ Your free trial has ended
             </p>
-            <button
-              onClick={() => router.push("/premium")}
+            <Link
+              href="/premium"
+              prefetch={true}
               className="bg-rose-600 text-white text-xs font-black px-3 py-1.5 rounded-lg flex-shrink-0"
             >
               Upgrade — ₹49
-            </button>
+            </Link>
           </div>
         )}
 
@@ -519,8 +524,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
 
           {/* 1. DAILY CHALLENGE CARD */}
-          <button
-            onClick={() => router.push("/daily")}
+          <Link
+            href="/daily"
+            prefetch={true}
             className="group relative bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
           >
             <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
@@ -539,11 +545,12 @@ export default function Dashboard() {
                 Execute a fresh set of 30 calibrated items daily to measure national placement matrix.
               </p>
             </div>
-          </button>
+          </Link>
 
           {/* 2. WEAK PRACTICE CARD */}
-          <button
-            onClick={() => router.push("/weak")}
+          <Link
+            href="/weak"
+            prefetch={true}
             className="group relative bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
           >
             <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
@@ -562,11 +569,12 @@ export default function Dashboard() {
                 Pehle ki gayi galtiyon ko sudharo aur kamzor topics par focus karke score badhao.
               </p>
             </div>
-          </button>
+          </Link>
 
           {/* 3. PYQ PRACTICE CARD */}
-          <button
-            onClick={() => router.push("/pyq")}
+          <Link
+            href="/pyq"
+            prefetch={true}
             className="group relative bg-white border border-indigo-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
           >
             <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
@@ -585,11 +593,12 @@ export default function Dashboard() {
                 Har attempt mein naye PYQs — real exam pattern par daily practice
               </p>
             </div>
-          </button>
+          </Link>
 
           {/* 4. CURRENT AFFAIRS CARD */}
-          <button
-            onClick={() => router.push("/current-affairs")}
+          <Link
+            href="/current-affairs"
+            prefetch={true}
             className="group relative bg-white border border-slate-200 hover:border-emerald-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
           >
             <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
@@ -608,7 +617,7 @@ export default function Dashboard() {
                 Exam ke liye sabse zaroori 30 current affairs sawal — roz naya update
               </p>
             </div>
-          </button>
+          </Link>
 
           {/* 5. MY TEST HISTORY CARD */}
           <button
@@ -634,8 +643,9 @@ export default function Dashboard() {
           </button>
 
           {/* 6. LEADERBOARD CARD */}
-          <button
-            onClick={() => router.push("/leaderboard")}
+          <Link
+            href="/leaderboard"
+            prefetch={true}
             className="group relative bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
           >
             <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
@@ -654,12 +664,13 @@ export default function Dashboard() {
                 Live Leaderboard par apni rank aur overall performance check karo
               </p>
             </div>
-          </button>
+          </Link>
         </div>
 
         {/* HERO RAPID ASSESSMENT ENGINE */}
-        <button
-          onClick={() => router.push("/fast-test")}
+        <Link
+          href="/fast-test"
+          prefetch={true}
           className="w-full bg-white hover:bg-slate-900/5 group border border-slate-200 hover:border-amber-500 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all duration-300 active:scale-[0.995] mb-6 sm:mb-8 shadow-sm"
         >
           <div className="flex items-start sm:items-center gap-3.5 text-left w-full sm:w-auto">
@@ -681,7 +692,7 @@ export default function Dashboard() {
           <div className="bg-slate-950 text-white group-hover:bg-blue-600 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl font-bold text-xs shadow-md transition-all whitespace-nowrap self-stretch text-center sm:self-auto flex items-center justify-center gap-1.5 w-full sm:w-auto mt-2 sm:mt-0">
             Start <ArrowUpRight size={14} />
           </div>
-        </button>
+        </Link>
 
         {/* FOOTER */}
         <footer className="mt-8 mb-6 bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-sm text-center">

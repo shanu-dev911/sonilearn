@@ -30,6 +30,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+a,
+button,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active,
+a:active,
+[role="button"]:active {
+  opacity: 0.82;
+}
+
 /* =========================
    HTML + BODY
 ========================= */
