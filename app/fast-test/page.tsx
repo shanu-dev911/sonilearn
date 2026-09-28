@@ -41,9 +41,70 @@ const normalizeExam = (exam: string) => {
   const cleaned = exam.trim();
   const underscored = cleaned.replace(/\s+/g, "_");
   return Array.from(
-    new Set([cleaned, underscored, underscored.toUpperCase(), underscored.toLowerCase()])
+    new Set([
+      cleaned,
+      cleaned.toUpperCase(),
+      cleaned.toLowerCase(),
+      underscored,
+      underscored.toUpperCase(),
+      underscored.toLowerCase(),
+    ])
   );
 };
+
+const normalizeValue = (value: unknown) =>
+  String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+async function loadExamQuestions(exam: string) {
+  const examVariants = normalizeExam(exam);
+  const refs = collection(db, "questions");
+  const results = await Promise.all([
+    getDocs(query(refs, where("examCategory", "in", examVariants))),
+    getDocs(query(refs, where("exam", "in", examVariants))),
+  ]);
+  const documents = new Map<string, { id: string; data: Record<string, any> }>();
+
+  results.forEach((result) => result.forEach((item) => {
+    documents.set(item.id, { id: item.id, data: item.data() as Record<string, any> });
+  }));
+
+  if (documents.size === 0) {
+    const snapshot = await getDocs(refs);
+    snapshot.forEach((item) => {
+      const data = item.data() as Record<string, any>;
+      if ([data.examCategory, data.exam].some((value) => normalizeValue(value) === normalizeValue(exam))) {
+        documents.set(item.id, { id: item.id, data });
+      }
+    });
+  }
+
+  return Array.from(documents.values()).filter(({ data }) =>
+    [data.examCategory, data.exam].some((value) => normalizeValue(value) === normalizeValue(exam))
+  );
+}
+
+function getQuestionOptions(data: Record<string, any>) {
+  const options = Array.isArray(data.options) ? data.options : [];
+  return ["A", "B", "C", "D"].map((letter, index) =>
+    data[`option${letter}`] || options[index] || ""
+  );
+}
+
+function getCorrectAnswer(data: Record<string, any>, options: string[]) {
+  const answer = String(data.correctOption || data.answer || "").trim();
+  const answerKey = answer.toUpperCase();
+  if (["A", "B", "C", "D"].includes(answerKey)) return options["ABCD".indexOf(answerKey)];
+  return options.find((option) => String(option).trim() === answer) || "";
+}
+
+function isCompleteQuestion(data: Record<string, any>) {
+  const options = getQuestionOptions(data);
+  return Boolean(
+    (data.questionEn || data.questionText || data.question) &&
+    options.every(Boolean) &&
+    getCorrectAnswer(data, options)
+  );
+}
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -155,34 +216,27 @@ export default function FastTestPage() {
     async function loadSubjects() {
       try {
         setError("");
-        const examFilters = normalizeExam(targetExam);
-
-        const snap = await getDocs(
-          query(
-            collection(db, "questions"),
-            where("examCategory", "==", targetExam),
-            where("difficulty", "==", "Hard")
-          )
-        );
-
-        const configuredSubjects = EXAM_WARRIOR_SUBJECTS[targetExam.trim()];
-        let targetHardSubjects: string[] = configuredSubjects ? [...configuredSubjects] : [];
-
+        const documents = await loadExamQuestions(targetExam);
+        const validQuestions = documents.filter(({ data }) => isCompleteQuestion(data));
+        const hardQuestions = validQuestions.filter(({ data }) => normalizeValue(data.difficulty) === "hard");
+        const questionsForSubjects = hardQuestions.length > 0 ? hardQuestions : validQuestions;
         const subjectDifficultyCounts: Record<string, number> = {};
-        snap.forEach((d) => {
-          const rawSubject = String((d.data() as any)?.subject || "").trim();
+        questionsForSubjects.forEach(({ data }) => {
+          const rawSubject = String(data.subject || "").trim();
           if (rawSubject) subjectDifficultyCounts[rawSubject] = (subjectDifficultyCounts[rawSubject] || 0) + 1;
         });
 
-        if (targetHardSubjects.length === 0) {
-          targetHardSubjects = Object.entries(subjectDifficultyCounts)
-            .sort(([, firstCount], [, secondCount]) => secondCount - firstCount)
-            .slice(0, 2)
-            .map(([subject]) => subject);
-        }
+        const discoveredSubjects = Object.entries(subjectDifficultyCounts)
+          .sort(([, firstCount], [, secondCount]) => secondCount - firstCount)
+          .map(([subject]) => subject);
+        const configuredSubjects = EXAM_WARRIOR_SUBJECTS[targetExam.trim()] || [];
+        const matchingConfiguredSubjects = configuredSubjects
+          .map((configured) => discoveredSubjects.find((subject) => normalizeValue(subject) === normalizeValue(configured)))
+          .filter((subject): subject is string => Boolean(subject));
+        const targetHardSubjects = Array.from(new Set([...matchingConfiguredSubjects, ...discoveredSubjects])).slice(0, 2);
 
         if (targetHardSubjects.length === 0) {
-          setError(`No Warrior questions available yet for ${targetExam}.`);
+          setError(`No complete questions are available for ${targetExam} yet.`);
           setPhase("result");
           return;
         }
@@ -211,38 +265,14 @@ export default function FastTestPage() {
       setTimeLeft(TIMER_SECONDS);
       setScore(0);
 
-      const targetHardSubjects = EXAM_WARRIOR_SUBJECTS[targetExam.trim()] || availableSubjects.slice(0, 2);
-
-      const snap = await getDocs(
-        query(
-          collection(db, "questions"),
-          where("examCategory", "==", targetExam),
-          where("subject", "in", targetHardSubjects),
-          where("difficulty", "==", "Hard")
-        )
+      const documents = await loadExamQuestions(targetExam);
+      const subjectQuestions = documents.filter(({ data }) =>
+        normalizeValue(data.subject) === normalizeValue(category) && isCompleteQuestion(data)
       );
-
-      let arr: Question[] = [];
-
-      snap.forEach((d) => {
-        const data: any = d.data();
-        const answerKey = (data.answer || "").toString().toUpperCase();
-
-        const optionMap: Record<string, string> = {
-          A: data.optionA,
-          B: data.optionB,
-          C: data.optionC,
-          D: data.optionD,
-        };
-        const answerValue = optionMap[answerKey];
-
-        const primaryText = data.questionEn || data.question || "";
-        const allOptionsPresent = data.optionA && data.optionB && data.optionC && data.optionD;
-
-        // VERIFICATION — skip invalid/incomplete questions entirely
-        if (!primaryText || !allOptionsPresent || !answerValue) return;
-
-        const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD];
+      const hardQuestions = subjectQuestions.filter(({ data }) => normalizeValue(data.difficulty) === "hard");
+      const questionsToUse = hardQuestions.length > 0 ? hardQuestions : subjectQuestions;
+      let arr: Question[] = questionsToUse.map(({ id, data }) => {
+        const rawOptEn = getQuestionOptions(data).map(String);
         const rawOptHi = [
           data.optionAHi || data.optionA,
           data.optionBHi || data.optionB,
@@ -250,12 +280,13 @@ export default function FastTestPage() {
           data.optionDHi || data.optionD,
         ];
 
-        const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
+        const correctAnswer = getCorrectAnswer(data, rawOptEn);
+        const correctIndex = rawOptEn.indexOf(correctAnswer);
         const { newOptEn, newOptHi, newCorrectText } = shuffleOptions(rawOptEn, rawOptHi, correctIndex);
 
-        arr.push({
-          id: d.id,
-          questionEn: primaryText,
+        return {
+          id,
+          questionEn: data.questionEn || data.questionText || data.question || "",
           questionHi: data.questionHi || "",
           optionsEn: newOptEn,
           optionsHi: newOptHi,
@@ -263,13 +294,13 @@ export default function FastTestPage() {
           explanationEn: data.explanationEn || "",
           explanationHi: data.explanationHi || "",
           subject: data.subject || category,
-        });
+        };
       });
 
       arr = arr.sort(() => Math.random() - 0.5).slice(0, TOTAL_QUESTIONS);
 
       if (arr.length === 0) {
-        setError(`No Warrior questions available yet for ${targetExam}.`);
+        setError(`No complete questions are available for ${category} in ${targetExam} yet.`);
         setPhase("result");
         return;
       }
