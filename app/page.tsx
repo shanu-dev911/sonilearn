@@ -33,9 +33,9 @@ import {
   Video
 } from "lucide-react";
 
-const WhatsAppButton = loadClientComponent(() => import("@/components/WhatsAppButton"), { ssr: false });
-const InstallPrompt = loadClientComponent(() => import("@/components/InstallPrompt"), { ssr: false });
-const UpdatePwaBanner = loadClientComponent(() => import("@/components/UpdatePwaBanner"), { ssr: false });
+const WhatsAppButton = loadClientComponent(() => import("@/components/WhatsAppButton"), { ssr: false, loading: () => null });
+const InstallPrompt = loadClientComponent(() => import("@/components/InstallPrompt"), { ssr: false, loading: () => null });
+const UpdatePwaBanner = loadClientComponent(() => import("@/components/UpdatePwaBanner"), { ssr: false, loading: () => null });
 
 interface TestAttempt {
   id: string;

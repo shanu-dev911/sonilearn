@@ -27,11 +27,16 @@ if (typeof window !== "undefined") {
 
   app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
-  });
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch (error) {
+    console.warn("Persistent Firestore cache unavailable; using default cache.", error);
+    db = getFirestore(app);
+  }
 
   // 🎯 PERSISTENCE — user rahega logged-in even after closing browser,
   // until they explicitly click Logout.

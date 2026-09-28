@@ -17,7 +17,7 @@ const navItems = [
         label: "Home",
     },
     {
-        href: "/tests",
+        href: "/practice",
         icon: BookOpen,
         label: "Tests",
     },
@@ -77,7 +77,8 @@ export default function BottomNav() {
                         <Link
                             key={href}
                             href={href}
-                            className="flex flex-col items-center justify-center text-xs font-medium"
+                            prefetch={true}
+                            className="flex flex-col items-center justify-center text-xs font-medium active:scale-95 transition-transform"
                         >
                             <Icon
                                 size={22}
