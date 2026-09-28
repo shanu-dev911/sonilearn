@@ -28,8 +28,10 @@ import {
   Heart,
   History,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Video
 } from "lucide-react";
+
 const WhatsAppButton = loadClientComponent(() => import("@/components/WhatsAppButton"), { ssr: false });
 const InstallPrompt = loadClientComponent(() => import("@/components/InstallPrompt"), { ssr: false });
 const UpdatePwaBanner = loadClientComponent(() => import("@/components/UpdatePwaBanner"), { ssr: false });
@@ -213,7 +215,7 @@ export default function Dashboard() {
               onClick={() => setShowWelcome(false)}
               className="w-full mt-6 bg-slate-900 text-white h-12 rounded-xl font-bold text-sm"
             >
-              Let's Go 🚀
+              Let&apos;s Go 🚀
             </button>
           </div>
         </div>
@@ -261,7 +263,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Attempts Scroll List with Wrong Answer Calculation */}
+            {/* Attempts Scroll List */}
             <div className="flex-1 overflow-y-auto py-3 space-y-2.5 pr-1">
               {recentAttempts.length === 0 ? (
                 <div className="text-center py-10">
@@ -481,6 +483,38 @@ export default function Dashboard() {
           ))}
         </div>
 
+        {/* 🎬 COACHING CLASSES TEASER BANNER (Just Above Cards / Below Stats) */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-3xl p-5 sm:p-6 text-white shadow-lg relative overflow-hidden mb-6">
+          <div className="absolute -right-8 -top-8 w-28 h-28 bg-blue-600/20 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1.5 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  🚀 LAUNCHING SOON
+                </span>
+                <span className="text-[11px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-500/30 px-2 py-0.5 rounded-lg">
+                  SSC & Railway Batch
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black leading-snug text-white flex items-center gap-2">
+                <Video size={18} className="text-blue-400" />
+                Online Coaching Concept Classes
+              </h3>
+              <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                Top Faculty ke Subject-wise lectures, tricky short tricks aur previous year video solutions jald live honge. Included in all paid passes!
+              </p>
+            </div>
+
+            <button
+              onClick={() => alert("Classes ki shooting aur editing chal rahi hai. Next update me batches live ho jayenge! 🚀")}
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold transition-all border border-white/15 whitespace-nowrap shrink-0"
+            >
+              Notify Me 🔔
+            </button>
+          </div>
+        </div>
+
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
 
@@ -576,7 +610,7 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* 5. 🎯 MY TEST HISTORY CARD (LEADERBOARD KE THEEK PEHLE) */}
+          {/* 5. MY TEST HISTORY CARD */}
           <button
             onClick={() => setShowHistoryModal(true)}
             className="group relative bg-white border border-slate-200 hover:border-indigo-500 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 text-left flex flex-col justify-between min-h-[160px] sm:min-h-[220px] active:scale-[0.99] w-full"
