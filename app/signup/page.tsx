@@ -27,6 +27,7 @@ import {
 import { auth, db } from "@/lib/firebase-client";
 import { FcGoogle } from "react-icons/fc";
 import { FiMail, FiLock, FiGift } from "react-icons/fi";
+import { Eye, EyeOff } from "lucide-react";
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -55,6 +56,7 @@ export default function SignupPage() {
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [referralInput, setReferralInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [checkingRedirect, setCheckingRedirect] = useState(true);
@@ -136,7 +138,8 @@ export default function SignupPage() {
             });
     }, []);
 
-    const handleSignup = async () => {
+    const handleSignup = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         if (!email || !password) {
             alert("Please enter email & password");
             return;
@@ -246,66 +249,78 @@ export default function SignupPage() {
                         New Registration ✍️
                     </h2>
 
-                    {/* Referral Code (Optional - Works for both Google and Email) */}
-                    <div className="bg-white border border-dashed border-indigo-200 rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-sm mb-4">
-                        <FiGift className="text-indigo-600 text-xl flex-shrink-0" />
-                        <input
-                            type="text"
-                            placeholder="Referral Code (Optional)"
-                            value={referralInput}
-                            onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-                            className="w-full outline-none bg-transparent font-black tracking-wider text-indigo-700 placeholder:font-medium placeholder:tracking-normal placeholder:text-gray-300 uppercase text-sm"
-                        />
+                    <form onSubmit={handleSignup}>
+                        <div className="bg-white border border-slate-200 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-sm mb-4 transition-colors">
+                            <FiGift className="text-indigo-600 text-xl flex-shrink-0" aria-hidden="true" />
+                            <input
+                                type="text"
+                                aria-label="Referral code (optional)"
+                                placeholder="Referral Code (Optional)"
+                                value={referralInput}
+                                onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                                autoCapitalize="characters"
+                                className="w-full outline-none bg-transparent font-black tracking-wider text-slate-800 placeholder:font-medium placeholder:tracking-normal placeholder:text-slate-400 uppercase text-sm"
+                            />
+                        </div>
+
+                        <div className="bg-white border border-slate-200 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-4 transition-colors">
+                            <FiMail className="text-blue-600 text-xl flex-shrink-0" aria-hidden="true" />
+                            <input
+                                type="email"
+                                autoComplete="email"
+                                aria-label="Email address"
+                                placeholder="Enter Email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full outline-none bg-transparent font-semibold text-slate-800 placeholder:text-slate-400 text-sm"
+                            />
+                        </div>
+
+                        <div className="bg-white border border-slate-200 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-6 transition-colors">
+                            <FiLock className="text-blue-600 text-xl flex-shrink-0" aria-hidden="true" />
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                autoComplete="new-password"
+                                aria-label="Create password"
+                                placeholder="Create Password (min 6 chars)"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full outline-none bg-transparent font-semibold text-slate-800 placeholder:text-slate-400 text-sm"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((visible) => !visible)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                aria-pressed={showPassword}
+                                className="text-slate-500 hover:text-slate-800 p-1 rounded-lg"
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className={`w-full py-4 rounded-2xl font-black text-white transition-all shadow-md shadow-blue-500/20 active:scale-98 ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                        >
+                            {loading ? "Creating Account..." : "Create Account 🚀"}
+                        </button>
+                    </form>
+
+                    <div className="flex items-center gap-3 my-6" aria-label="Or sign up with Google">
+                        <div className="flex-1 h-px bg-slate-300"></div>
+                        <span className="text-xs text-slate-500 font-black uppercase tracking-widest">OR</span>
+                        <div className="flex-1 h-px bg-slate-300"></div>
                     </div>
 
-                    {/* Google Signup Button */}
                     <button
+                        type="button"
                         onClick={handleGoogle}
                         disabled={loading}
-                        className="w-full bg-white border border-gray-200 rounded-2xl py-4 flex items-center justify-center gap-3 font-black text-gray-700 hover:bg-gray-50 transition shadow-sm active:scale-98"
+                        className="w-full bg-white border border-slate-200 rounded-2xl py-4 flex items-center justify-center gap-3 font-black text-slate-700 hover:bg-slate-50 transition shadow-sm active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         <FcGoogle size={24} />
                         Sign Up with Google
-                    </button>
-
-                    <div className="flex items-center gap-3 my-6">
-                        <div className="flex-1 h-[1px] bg-gray-200"></div>
-                        <span className="text-xs text-gray-400 font-black uppercase tracking-widest">
-                            OR REGISTER WITH EMAIL
-                        </span>
-                        <div className="flex-1 h-[1px] bg-gray-200"></div>
-                    </div>
-
-                    {/* Email Signup Fields */}
-                    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-4">
-                        <FiMail className="text-blue-600 text-xl flex-shrink-0" />
-                        <input
-                            type="email"
-                            placeholder="Enter Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full outline-none bg-transparent font-semibold text-gray-700 placeholder:text-gray-300 text-sm"
-                        />
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-6">
-                        <FiLock className="text-blue-600 text-xl flex-shrink-0" />
-                        <input
-                            type="password"
-                            placeholder="Create Password (min 6 chars)"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full outline-none bg-transparent font-semibold text-gray-700 placeholder:text-gray-300 text-sm"
-                        />
-                    </div>
-
-                    <button
-                        onClick={handleSignup}
-                        disabled={loading}
-                        className={`w-full py-4 rounded-2xl font-black text-white transition-all shadow-md shadow-blue-500/20 active:scale-98 ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                            }`}
-                    >
-                        {loading ? "Creating Account..." : "Create Account 🚀"}
                     </button>
                 </div>
 

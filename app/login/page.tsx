@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import {
     signInWithEmailAndPassword,
@@ -23,6 +24,7 @@ import {
 import { auth, db } from "@/lib/firebase-client";
 import { FcGoogle } from "react-icons/fc";
 import { FiMail, FiLock } from "react-icons/fi";
+import { Eye, EyeOff } from "lucide-react";
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -37,6 +39,7 @@ export default function LoginPage() {
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [checkingRedirect, setCheckingRedirect] = useState(true);
 
@@ -91,7 +94,8 @@ export default function LoginPage() {
             });
     }, []);
 
-    const handleLogin = async () => {
+    const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         if (!email || !password) {
             alert("Enter email & password");
             return;
@@ -167,62 +171,71 @@ export default function LoginPage() {
                         Welcome Back 👋
                     </h2>
 
-                    {/* GOOGLE LOGIN (PRIMARY - 1 CLICK) */}
+                    <form onSubmit={handleLogin}>
+                        <div className="bg-white border border-slate-200 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-4 transition-colors">
+                            <FiMail className="text-blue-600 text-xl flex-shrink-0" aria-hidden="true" />
+                            <input
+                                type="email"
+                                autoComplete="email"
+                                aria-label="Email address"
+                                placeholder="Enter Email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full outline-none bg-transparent font-semibold text-slate-800 placeholder:text-slate-400 text-sm"
+                            />
+                        </div>
+
+                        <div className="bg-white border border-slate-200 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-2 transition-colors">
+                            <FiLock className="text-blue-600 text-xl flex-shrink-0" aria-hidden="true" />
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                autoComplete="current-password"
+                                aria-label="Password"
+                                placeholder="Enter Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full outline-none bg-transparent font-semibold text-slate-800 placeholder:text-slate-400 text-sm"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((visible) => !visible)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                aria-pressed={showPassword}
+                                className="text-slate-500 hover:text-slate-800 p-1 rounded-lg"
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+
+                        <div className="flex justify-end mb-6">
+                            <Link href="/forgot-password" className="text-xs text-blue-700 font-bold hover:underline">
+                                Forgot Password?
+                            </Link>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className={`w-full py-4 rounded-2xl font-black text-white transition-all shadow-md shadow-blue-500/20 active:scale-98 ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                        >
+                            {loading ? "Please wait..." : "Log In 🚀"}
+                        </button>
+                    </form>
+
+                    <div className="flex items-center gap-3 my-6" aria-label="Or continue with Google">
+                        <div className="flex-1 h-px bg-slate-300"></div>
+                        <span className="text-xs text-slate-500 font-black uppercase tracking-widest">OR</span>
+                        <div className="flex-1 h-px bg-slate-300"></div>
+                    </div>
+
                     <button
+                        type="button"
                         onClick={handleGoogle}
                         disabled={loading}
-                        className="w-full bg-white border border-gray-200 rounded-2xl py-4 flex items-center justify-center gap-3 font-black text-gray-700 hover:bg-gray-50 transition shadow-sm active:scale-98"
+                        className="w-full bg-white border border-slate-200 rounded-2xl py-4 flex items-center justify-center gap-3 font-black text-slate-700 hover:bg-slate-50 transition shadow-sm active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         <FcGoogle size={24} />
                         Continue with Google
-                    </button>
-
-                    <div className="flex items-center gap-3 my-6">
-                        <div className="flex-1 h-[1px] bg-gray-200"></div>
-                        <span className="text-xs text-gray-400 font-black uppercase tracking-widest">
-                            OR LOGIN WITH EMAIL
-                        </span>
-                        <div className="flex-1 h-[1px] bg-gray-200"></div>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-4">
-                        <FiMail className="text-blue-600 text-xl flex-shrink-0" />
-                        <input
-                            type="email"
-                            placeholder="Enter Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full outline-none bg-transparent font-semibold text-gray-700 placeholder:text-gray-300 text-sm"
-                        />
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-4 flex items-center gap-3 shadow-sm mb-2">
-                        <FiLock className="text-blue-600 text-xl flex-shrink-0" />
-                        <input
-                            type="password"
-                            placeholder="Enter Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full outline-none bg-transparent font-semibold text-gray-700 placeholder:text-gray-300 text-sm"
-                        />
-                    </div>
-
-                    <div className="flex justify-end mb-6">
-                        <button
-                            onClick={() => router.push("/forgot-password")}
-                            className="text-xs text-blue-600 font-bold hover:underline"
-                        >
-                            Forgot Password?
-                        </button>
-                    </div>
-
-                    <button
-                        onClick={handleLogin}
-                        disabled={loading}
-                        className={`w-full py-4 rounded-2xl font-black text-white transition-all shadow-md shadow-blue-500/20 active:scale-98 ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                            }`}
-                    >
-                        {loading ? "Please wait..." : "Log In 🚀"}
                     </button>
                 </div>
 
