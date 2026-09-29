@@ -33,6 +33,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
 
 type Question = {
   id: string;
@@ -109,10 +110,27 @@ export default function WeakPage() {
         const qEn = data.questionEn || data.question || "";
         const qHi = data.questionHi || data.questionHindi || "";
 
-        const optsEn = data.optionsEn || data.options || [];
-        const optsHi = data.optionsHi || data.optionsHindi || [];
-
-        const correctAns = data.correctAnswer || data.answer || "";
+        const rawOptsEn = data.optionsEn || data.options || [];
+        const rawOptsHi = data.optionsHi || data.optionsHindi || [];
+        const optsEn = (Array.isArray(rawOptsEn) ? rawOptsEn : []).map((option: unknown) =>
+          cleanOptionText(String(option || ""))
+        );
+        const optsHi = optsEn.map((option: string, index: number) =>
+          cleanOptionTranslation(String(rawOptsHi[index] || ""), option)
+        );
+        const rawCorrectAnswer = String(data.correctAnswer || data.answer || "").trim();
+        const answerKey = rawCorrectAnswer.toUpperCase();
+        const answerIndex = ["A", "B", "C", "D"].indexOf(answerKey);
+        const cleanedAnswer = cleanOptionText(rawCorrectAnswer);
+        const matchingAnswerIndex = optsEn.findIndex((option: string, index: number) =>
+          option.toLowerCase() === cleanedAnswer.toLowerCase() ||
+          optsHi[index]?.toLowerCase() === cleanedAnswer.toLowerCase()
+        );
+        const correctAns = answerIndex >= 0
+          ? optsEn[answerIndex] || ""
+          : matchingAnswerIndex >= 0
+            ? optsEn[matchingAnswerIndex]
+            : cleanedAnswer;
 
         const expEn =
           data.explanationEn ||

@@ -30,6 +30,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
+import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
 import { Timer, CheckCircle, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Flag, Newspaper, BookOpen, Calendar, Lock, Crown } from "lucide-react";
 import { checkTrialStatus } from "@/lib/trial-check";
 
@@ -234,13 +235,10 @@ export default function CurrentAffairsPage() {
 
         if (!primaryText || !allOptionsPresent || !answerValue) return;
 
-        const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD];
-        const rawOptHi = [
-          data.optionAHi || data.optionA,
-          data.optionBHi || data.optionB,
-          data.optionCHi || data.optionC,
-          data.optionDHi || data.optionD,
-        ];
+        const rawOptEn = [data.optionA, data.optionB, data.optionC, data.optionD]
+          .map((option) => cleanOptionText(String(option || "")));
+        const rawOptHi = [data.optionAHi, data.optionBHi, data.optionCHi, data.optionDHi]
+          .map((translation, index) => cleanOptionTranslation(String(translation || ""), rawOptEn[index]));
 
         const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
         const { newOptEn, newOptHi, newCorrectText } = shuffleQuestionOptions(

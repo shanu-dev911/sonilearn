@@ -19,6 +19,7 @@ import { db, auth } from "@/lib/firebase-client";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { checkTrialStatus } from "@/lib/trial-check";
 import { EXAM_WARRIOR_SUBJECTS } from "@/lib/examSubjects";
+import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
 
 type Question = {
   id: string;
@@ -86,7 +87,7 @@ async function loadExamQuestions(exam: string) {
 function getQuestionOptions(data: Record<string, any>) {
   const options = Array.isArray(data.options) ? data.options : [];
   return ["A", "B", "C", "D"].map((letter, index) =>
-    data[`option${letter}`] || options[index] || ""
+    cleanOptionText(String(data[`option${letter}`] || options[index] || ""))
   );
 }
 
@@ -94,7 +95,8 @@ function getCorrectAnswer(data: Record<string, any>, options: string[]) {
   const answer = String(data.correctOption || data.answer || "").trim();
   const answerKey = answer.toUpperCase();
   if (["A", "B", "C", "D"].includes(answerKey)) return options["ABCD".indexOf(answerKey)];
-  return options.find((option) => String(option).trim() === answer) || "";
+  const cleanedAnswer = cleanOptionText(answer);
+  return options.find((option) => String(option).trim() === cleanedAnswer) || "";
 }
 
 function isCompleteQuestion(data: Record<string, any>) {
@@ -273,12 +275,8 @@ export default function FastTestPage() {
       const questionsToUse = hardQuestions.length > 0 ? hardQuestions : subjectQuestions;
       let arr: Question[] = questionsToUse.map(({ id, data }) => {
         const rawOptEn = getQuestionOptions(data).map(String);
-        const rawOptHi = [
-          data.optionAHi || data.optionA,
-          data.optionBHi || data.optionB,
-          data.optionCHi || data.optionC,
-          data.optionDHi || data.optionD,
-        ];
+        const rawOptHi = [data.optionAHi, data.optionBHi, data.optionCHi, data.optionDHi]
+          .map((translation, index) => cleanOptionTranslation(String(translation || ""), rawOptEn[index]));
 
         const correctAnswer = getCorrectAnswer(data, rawOptEn);
         const correctIndex = rawOptEn.indexOf(correctAnswer);

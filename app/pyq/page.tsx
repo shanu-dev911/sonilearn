@@ -30,6 +30,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
+import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
 import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, ScrollText, Lock, Crown, Calendar, Layers, Sparkles } from "lucide-react";
 import { checkTrialStatus } from "@/lib/trial-check";
 
@@ -128,7 +129,7 @@ const normalizeTargetExam = (exam: string) => {
 };
 
 const getAnswerKey = (answer: unknown, options: string[]) => {
-  const normalizedAnswer = String(answer ?? "").trim();
+  const normalizedAnswer = cleanOptionText(String(answer ?? "").trim());
   const answerKey = normalizedAnswer.toUpperCase();
 
   if (["A", "B", "C", "D"].includes(answerKey)) {
@@ -136,7 +137,7 @@ const getAnswerKey = (answer: unknown, options: string[]) => {
   }
 
   const answerIndex = options.findIndex(
-    (option) => option.trim().toLowerCase() === normalizedAnswer.toLowerCase()
+    (option) => cleanOptionText(option).toLowerCase() === normalizedAnswer.toLowerCase()
   );
 
   return answerIndex >= 0 ? ["A", "B", "C", "D"][answerIndex] : "";
@@ -328,10 +329,10 @@ export default function PYQPage() {
 
       rawDocsData.forEach((data: any) => {
         const optionMap: Record<string, string> = {
-          A: String(data.optionA ?? "").trim(),
-          B: String(data.optionB ?? "").trim(),
-          C: String(data.optionC ?? "").trim(),
-          D: String(data.optionD ?? "").trim(),
+          A: cleanOptionText(String(data.optionA ?? "")),
+          B: cleanOptionText(String(data.optionB ?? "")),
+          C: cleanOptionText(String(data.optionC ?? "")),
+          D: cleanOptionText(String(data.optionD ?? "")),
         };
         const rawOptions = [optionMap.A, optionMap.B, optionMap.C, optionMap.D];
         const answerKey = getAnswerKey(data.answer, rawOptions);
@@ -361,12 +362,8 @@ export default function PYQPage() {
         }
 
         const rawOptEn = rawOptions;
-        const rawOptHi = [
-          String(data.optionAHi || optionMap.A),
-          String(data.optionBHi || optionMap.B),
-          String(data.optionCHi || optionMap.C),
-          String(data.optionDHi || optionMap.D),
-        ];
+        const rawOptHi = [data.optionAHi, data.optionBHi, data.optionCHi, data.optionDHi]
+          .map((translation, index) => cleanOptionTranslation(String(translation || ""), rawOptEn[index]));
 
         const correctIndex = ["A", "B", "C", "D"].indexOf(answerKey);
 
