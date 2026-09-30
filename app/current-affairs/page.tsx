@@ -51,7 +51,7 @@ interface Question {
 
 type Phase = "loading" | "locked" | "intro" | "quiz" | "submitting" | "result";
 
-const TOTAL_QUESTIONS = 30;
+const TOTAL_QUESTIONS = 10;
 const TEST_DURATION = getExamTestConfig("current-affairs", undefined, TOTAL_QUESTIONS);
 const FETCH_POOL_LIMIT = 10000;
 

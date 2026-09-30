@@ -37,7 +37,7 @@ type Question = {
 
 type Phase = "loading" | "locked" | "subject-select" | "quiz" | "submitting" | "result";
 
-const TOTAL_QUESTIONS = 30;
+const TOTAL_QUESTIONS = 10;
 const TEST_DURATION = getExamTestConfig("battleground", undefined, TOTAL_QUESTIONS);
 
 const normalizeExam = (exam: string) => {
@@ -651,7 +651,7 @@ export default function FastTestPage() {
         <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-3.5">Progress Map</span>
           <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
-            {questions.map((_, i) => {
+            {questions.slice(0, TOTAL_QUESTIONS).map((_, i) => {
               const isCurrent = i === current;
               const isAnswered = !!answers[i];
               return (

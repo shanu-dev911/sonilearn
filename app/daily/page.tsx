@@ -55,7 +55,7 @@ type Phase =
   | "submitting"
   | "result";
 
-const TOTAL_QUESTIONS = 30;
+const TOTAL_QUESTIONS = 15;
 const TEST_DURATION = getExamTestConfig("daily-challenge", undefined, TOTAL_QUESTIONS);
 
 // 🎯 Double-pass Fisher-Yates with crypto randomness
@@ -688,7 +688,7 @@ export default function DailyChallengePage() {
             Deployment Matrix Map
           </span>
           <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
-            {questions.map((_, i) => {
+            {questions.slice(0, TOTAL_QUESTIONS).map((_, i) => {
               const isCurrent = i === current;
               const isAnswered = !!answers[i];
               return (
