@@ -620,7 +620,7 @@ export default function PYQPage() {
                 <Layers size={12} className="text-indigo-600" /> Select Shift / Paper
               </label>
               <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                {availableShifts.map((sh) => (
+                {DEFAULT_SHIFTS.map((sh) => (
                   <button
                     key={sh}
                     type="button"
