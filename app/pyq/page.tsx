@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 import {
   useEffect,
   useState,
-  useRef,
   useMemo,
 } from "react";
 
@@ -31,6 +30,8 @@ import {
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
+import { getExamTestConfig, formatTimer } from "@/lib/timer-config";
+import { useCountdownTimer } from "@/lib/useCountdownTimer";
 import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, ScrollText, Lock, Crown, Calendar, Layers, Sparkles } from "lucide-react";
 import { checkTrialStatus } from "@/lib/trial-check";
 
@@ -58,7 +59,6 @@ type Phase =
   | "result";
 
 const TOTAL_QUESTIONS = 30;
-const TIMER_SECONDS = 30 * 60; // 30 minutes
 const FETCH_POOL_LIMIT = 500;
 
 // 🎯 COMPLETE 2016 - 2026 TIMELINE (Always Available on Screen)
@@ -77,12 +77,6 @@ const ALL_EXAM_YEARS = [
 ];
 
 const DEFAULT_SHIFTS = ["All Shifts", "Shift 1", "Shift 2", "Shift 3"];
-
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
 
 // 🎯 Crypto Random Shuffler
 function getSecureRandom(): number {
@@ -149,11 +143,16 @@ export default function PYQPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
   const [current, setCurrent] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
   const [score, setScore] = useState(0);
   const [error, setError] = useState("");
   const [targetExam, setTargetExam] = useState("");
   const [poolSize, setPoolSize] = useState(0);
+  const testDuration = getExamTestConfig("pyq", targetExam, TOTAL_QUESTIONS);
+  const { remainingSeconds: timeLeft, reset: resetTimer } = useCountdownTimer(
+    testDuration.seconds,
+    phase === "quiz",
+    () => { void finishTest(); }
+  );
 
   // Dynamic Filters (With 2016-2026 Guaranteed Display)
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
@@ -166,7 +165,6 @@ export default function PYQPage() {
   const [rawDocsData, setRawDocsData] = useState<any[]>([]);
 
   const [user, authLoading, authError] = useAuthState(auth);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const q = useMemo(() => {
     return (
@@ -323,7 +321,7 @@ export default function PYQPage() {
       setQuestions([]);
       setAnswers([]);
       setCurrent(0);
-      setTimeLeft(TIMER_SECONDS);
+      resetTimer();
 
       let arr: Question[] = [];
 
@@ -407,26 +405,6 @@ export default function PYQPage() {
     }
   };
 
-  // MASTER TIMER
-  useEffect(() => {
-    if (phase !== "quiz") return;
-
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          finishTest();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [phase]);
-
   const selectAnswer = (option: string) => {
     const updated = [...answers];
     updated[current] = option;
@@ -442,7 +420,6 @@ export default function PYQPage() {
   };
 
   const finishTest = async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
     setPhase("submitting");
 
     let finalScore = 0;
@@ -580,8 +557,9 @@ export default function PYQPage() {
               Select Year (2016–2026), Shift and Subject to practice exactly like real exam environment.
             </p>
             <p className="text-slate-400 text-[11px] mb-6 font-medium">
-              {poolSize}+ questions loaded • 30 Questions • 30 Minutes Timer
+              {poolSize}+ questions loaded • {TOTAL_QUESTIONS} Questions • {testDuration.label}
             </p>
+            <p className="text-indigo-700 text-xs font-bold mb-4">{testDuration.badge}</p>
 
             {/* 1. YEAR SELECTOR (Guaranteed 2016 - 2026 Display) */}
             <div className="text-left mb-5">
@@ -782,7 +760,7 @@ export default function PYQPage() {
 
           <div className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-xl font-black text-lg tracking-tight flex items-center gap-2 shadow-sm">
             <Timer size={16} className="animate-pulse" />
-            <span>{formatTime(timeLeft)}</span>
+            <span>{formatTimer(timeLeft)}</span>
           </div>
         </div>
 

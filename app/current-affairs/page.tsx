@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 import {
   useEffect,
   useState,
-  useRef,
   useMemo,
 } from "react";
 
@@ -31,6 +30,8 @@ import {
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
+import { getExamTestConfig, formatTimer } from "@/lib/timer-config";
+import { useCountdownTimer } from "@/lib/useCountdownTimer";
 import { Timer, CheckCircle, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Flag, Newspaper, BookOpen, Calendar, Lock, Crown } from "lucide-react";
 import { checkTrialStatus } from "@/lib/trial-check";
 
@@ -51,16 +52,10 @@ interface Question {
 type Phase = "loading" | "locked" | "intro" | "quiz" | "submitting" | "result";
 
 const TOTAL_QUESTIONS = 30;
-const TIMER_SECONDS = 30 * 60; // 30 minutes
+const TEST_DURATION = getExamTestConfig("current-affairs", undefined, TOTAL_QUESTIONS);
 const FETCH_POOL_LIMIT = 10000;
 
 const EXAM_PREFIX = "Current_Affairs";
-
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
 
 function getSecureRandom(): number {
   if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
@@ -103,13 +98,15 @@ export default function CurrentAffairsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
   const [current, setCurrent] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
+  const { remainingSeconds: timeLeft, reset: resetTimer } = useCountdownTimer(
+    TEST_DURATION.seconds,
+    phase === "quiz",
+    () => { void finishTest(); }
+  );
   const [score, setScore] = useState(0);
   const [error, setError] = useState("");
   const [poolSize, setPoolSize] = useState(0);
   const [user, authLoading, authError] = useAuthState(auth);
-
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const q = useMemo(() => {
     return (
@@ -204,7 +201,7 @@ export default function CurrentAffairsPage() {
       setQuestions([]);
       setAnswers([]);
       setCurrent(0);
-      setTimeLeft(TIMER_SECONDS);
+      resetTimer();
 
       const snap = await getDocs(
         query(
@@ -280,25 +277,6 @@ export default function CurrentAffairsPage() {
     }
   };
 
-  useEffect(() => {
-    if (phase !== "quiz") return;
-
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          finishTest();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [phase]);
-
   const selectAnswer = (option: string) => {
     if (hasAnswered) return;
     const updated = [...answers];
@@ -315,7 +293,6 @@ export default function CurrentAffairsPage() {
   };
 
   const finishTest = async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
     setPhase("submitting");
 
     let finalScore = 0;
@@ -442,8 +419,9 @@ export default function CurrentAffairsPage() {
             </div>
             <h2 className="text-xl font-black text-slate-900 mb-2">Daily Current Affairs</h2>
             <p className="text-slate-500 text-sm leading-relaxed mb-1">
-              {TOTAL_QUESTIONS} questions, {TIMER_SECONDS / 60} minutes — with explanations and exam relevance shown after every answer.
+              {TOTAL_QUESTIONS} questions, {TEST_DURATION.label} — with explanations and exam relevance shown after every answer.
             </p>
+            <p className="text-emerald-700 text-xs font-bold mb-4">{TEST_DURATION.badge}</p>
             <p className="text-slate-400 text-xs mb-6">
               {poolSize}+ questions in the bank • fresh random mix every attempt
             </p>
@@ -568,7 +546,7 @@ export default function CurrentAffairsPage() {
 
           <div className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-xl font-black text-lg tracking-tight flex items-center gap-2 shadow-sm">
             <Timer size={16} className="animate-pulse" />
-            <span>{formatTime(timeLeft)}</span>
+            <span>{formatTimer(timeLeft)}</span>
           </div>
         </div>
 

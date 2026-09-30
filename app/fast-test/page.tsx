@@ -20,6 +20,8 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { checkTrialStatus } from "@/lib/trial-check";
 import { EXAM_WARRIOR_SUBJECTS } from "@/lib/examSubjects";
 import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
+import { getExamTestConfig, formatTimer } from "@/lib/timer-config";
+import { useCountdownTimer } from "@/lib/useCountdownTimer";
 
 type Question = {
   id: string;
@@ -36,7 +38,7 @@ type Question = {
 type Phase = "loading" | "locked" | "subject-select" | "quiz" | "submitting" | "result";
 
 const TOTAL_QUESTIONS = 30;
-const TIMER_SECONDS = 30 * 60; // 30 minutes
+const TEST_DURATION = getExamTestConfig("battleground", undefined, TOTAL_QUESTIONS);
 
 const normalizeExam = (exam: string) => {
   const cleaned = exam.trim();
@@ -108,12 +110,6 @@ function isCompleteQuestion(data: Record<string, any>) {
   );
 }
 
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
 // 🎯 STRONG RUNTIME RESHUFFLE — double-pass Fisher-Yates using crypto randomness
 // where available, guarantees the option order is genuinely different every
 // single time a question loads, regardless of how it was stored in the database.
@@ -161,7 +157,11 @@ export default function FastTestPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
   const [current, setCurrent] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
+  const { remainingSeconds: timeLeft, reset: resetTimer } = useCountdownTimer(
+    TEST_DURATION.seconds,
+    phase === "quiz",
+    () => { void finishTest(); }
+  );
   const [score, setScore] = useState(0);
 
   // LOAD TARGET EXAM + CHECK PREMIUM/TRIAL ACCESS
@@ -264,7 +264,7 @@ export default function FastTestPage() {
       setQuestions([]);
       setAnswers([]);
       setCurrent(0);
-      setTimeLeft(TIMER_SECONDS);
+      resetTimer();
       setScore(0);
 
       const documents = await loadExamQuestions(targetExam);
@@ -312,24 +312,6 @@ export default function FastTestPage() {
       setPhase("result");
     }
   };
-
-  // TIMER
-  useEffect(() => {
-    if (phase !== "quiz") return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          finishTest();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [phase]);
 
   const selectAnswer = (option: string) => {
     const updated = [...answers];
@@ -469,6 +451,7 @@ export default function FastTestPage() {
           <p className="text-slate-500 text-sm mb-6">
             Aapke is exam ke 2 sabse hard subjects ke verified questions yahan milenge.
           </p>
+          <p className="text-amber-700 text-xs font-bold mb-4">{TEST_DURATION.label} · {TEST_DURATION.badge}</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {availableSubjects.map((category) => (
@@ -575,7 +558,7 @@ export default function FastTestPage() {
           </div>
           <div className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-xl font-black text-lg tracking-tight flex items-center gap-2 shadow-sm">
             <Timer size={16} className="animate-pulse" />
-            <span>{formatTime(timeLeft)}</span>
+            <span>{formatTimer(timeLeft)}</span>
           </div>
         </div>
         <div className="h-1 w-full bg-slate-100">

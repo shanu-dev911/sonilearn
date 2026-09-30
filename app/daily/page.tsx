@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 import {
   useEffect,
   useState,
-  useRef,
   useMemo,
 } from "react";
 
@@ -31,6 +30,8 @@ import {
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { cleanOptionText, cleanOptionTranslation } from "@/lib/question-options";
+import { getExamTestConfig, formatTimer } from "@/lib/timer-config";
+import { useCountdownTimer } from "@/lib/useCountdownTimer";
 import { Timer, CheckCircle, ArrowLeft, ArrowRight, Flag, BookOpen } from "lucide-react";
 import { getSubjectsForExam } from "@/lib/examSubjects";
 
@@ -55,13 +56,7 @@ type Phase =
   | "result";
 
 const TOTAL_QUESTIONS = 30;
-const TIMER_SECONDS = 30 * 60; // 🎯 30 minutes
-
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+const TEST_DURATION = getExamTestConfig("daily-challenge", undefined, TOTAL_QUESTIONS);
 
 // 🎯 Double-pass Fisher-Yates with crypto randomness
 function getSecureRandom(): number {
@@ -100,7 +95,11 @@ export default function DailyChallengePage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
   const [current, setCurrent] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
+  const { remainingSeconds: timeLeft, reset: resetTimer } = useCountdownTimer(
+    TEST_DURATION.seconds,
+    phase === "quiz",
+    () => { void finishTest(); }
+  );
   const [score, setScore] = useState(0);
   const [error, setError] = useState("");
   const [targetExam, setTargetExam] = useState("");
@@ -121,8 +120,6 @@ export default function DailyChallengePage() {
       ])
     );
   };
-
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const q = useMemo(() => {
     return (
@@ -236,7 +233,7 @@ export default function DailyChallengePage() {
       setQuestions([]);
       setAnswers([]);
       setCurrent(0);
-      setTimeLeft(TIMER_SECONDS);
+      resetTimer();
 
       const examFilters = normalizeTargetExam(targetExam);
 
@@ -332,25 +329,6 @@ export default function DailyChallengePage() {
   };
 
   // MASTER TIMER
-  useEffect(() => {
-    if (phase !== "quiz") return;
-
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          finishTest();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [phase]);
-
   const selectAnswer = (option: string) => {
     const updated = [...answers];
     updated[current] = option;
@@ -367,7 +345,6 @@ export default function DailyChallengePage() {
 
   // 🎯 FINISH TEST (CLEAN: NO TRIAL DATE EXTENSIONS)
   const finishTest = async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
     setPhase("submitting");
 
     let finalScore = 0;
@@ -465,7 +442,8 @@ export default function DailyChallengePage() {
 
         <div className="max-w-2xl mx-auto px-4 mt-8">
           <h2 className="text-xl font-black text-slate-900 mb-1">Choose a Subject</h2>
-          <p className="text-slate-500 text-sm mb-6">Ek subject select karo, 30 verified questions milenge practice ke liye.</p>
+          <p className="text-slate-500 text-sm mb-2">Ek subject select karo, {TOTAL_QUESTIONS} verified questions milenge practice ke liye.</p>
+          <p className="text-amber-700 text-xs font-bold mb-6">{TEST_DURATION.label} · {TEST_DURATION.badge}</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {availableSubjects.map((subject) => (
@@ -595,7 +573,7 @@ export default function DailyChallengePage() {
 
           <div className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-xl font-black text-lg tracking-tight flex items-center gap-2 shadow-sm">
             <Timer size={16} className="animate-pulse" />
-            <span>{formatTime(timeLeft)}</span>
+            <span>{formatTimer(timeLeft)}</span>
           </div>
         </div>
 
