@@ -557,7 +557,7 @@ export default function PYQPage() {
               Select Year (2016–2026), Shift and Subject to practice exactly like real exam environment.
             </p>
             <p className="text-slate-400 text-[11px] mb-6 font-medium">
-              {poolSize}+ questions loaded • {TOTAL_QUESTIONS} Questions • {testDuration.label}
+              {TOTAL_QUESTIONS} Questions • Real Exam Mode • {testDuration.label}
             </p>
             <p className="text-indigo-700 text-xs font-bold mb-4">{testDuration.badge}</p>
 
