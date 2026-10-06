@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-client";
 import { checkTrialStatus } from "@/lib/trial-check";
 import {
@@ -30,7 +30,9 @@ import {
   History,
   CheckCircle2,
   XCircle,
-  Video
+  Video,
+  Play,
+  Clock
 } from "lucide-react";
 
 const WhatsAppButton = loadClientComponent(() => import("@/components/WhatsAppButton"), { ssr: false, loading: () => null });
@@ -47,6 +49,40 @@ interface TestAttempt {
   mode?: string;
 }
 
+interface DashboardVideo {
+  id: string;
+  youtubeId: string;
+  title: string;
+  faculty: string;
+  duration: string;
+  exam: string;
+  subject: string;
+}
+
+function extractYoutubeId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const input = value.trim();
+  if (/^[\w-]{11}$/.test(input)) return input;
+
+  try {
+    const url = new URL(input.startsWith("http") ? input : `https://${input}`);
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (!["youtube.com", "m.youtube.com", "youtube-nocookie.com", "youtu.be"].includes(hostname)) {
+      return null;
+    }
+
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    const id = hostname === "youtu.be"
+      ? pathParts[0]
+      : url.searchParams.get("v") ||
+        (["embed", "shorts", "live", "v"].includes(pathParts[0]) ? pathParts[1] : null);
+
+    return id && /^[\w-]{11}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Dashboard() {
   const [userName, setUserName] = useState("Student");
   const [targetExam, setTargetExam] = useState("Not Set");
@@ -54,6 +90,10 @@ export default function Dashboard() {
   const [userData, setUserData] = useState<any>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
+  const [latestVideo, setLatestVideo] = useState<DashboardVideo | null>(null);
+  const [isLatestVideoPlaying, setIsLatestVideoPlaying] = useState(false);
+  const [loadingLatestVideo, setLoadingLatestVideo] = useState(true);
+  const [latestVideoLoadError, setLatestVideoLoadError] = useState(false);
 
   // 🎯 Test History & Metrics States
   const [totalTests, setTotalTests] = useState(0);
@@ -64,6 +104,63 @@ export default function Dashboard() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchLatestVideo = async () => {
+      setLoadingLatestVideo(true);
+      setIsLatestVideoPlaying(false);
+      setLatestVideoLoadError(false);
+
+      try {
+        const videosQuery = query(
+          collection(db, "videos"),
+          orderBy("createdAt", "desc"),
+          limit(50),
+        );
+        const snapshot = await getDocs(videosQuery);
+        const videos = snapshot.docs.flatMap((videoDoc) => {
+          const data = videoDoc.data();
+          const youtubeId = extractYoutubeId(
+            data.youtubeId ?? data.youtubeUrl ?? data.videoUrl ?? data.url,
+          );
+          if (!youtubeId) return [];
+
+          return [{
+            id: videoDoc.id,
+            youtubeId,
+            title: typeof data.title === "string" ? data.title : "Untitled class",
+            faculty: typeof data.faculty === "string"
+              ? data.faculty
+              : typeof data.coachingName === "string" ? data.coachingName : "SoniLearn Faculty",
+            duration: typeof data.duration === "string" ? data.duration : "Full lecture",
+            exam: typeof data.exam === "string" ? data.exam : "All Exams",
+            subject: typeof data.subject === "string" ? data.subject : "General",
+          }];
+        });
+        const target = targetExam.trim().toLowerCase();
+        const matchingVideo = target && target !== "not set"
+          ? videos.find((video) => video.exam.trim().toLowerCase() === target)
+          : undefined;
+
+        if (isMounted) setLatestVideo(matchingVideo ?? videos[0] ?? null);
+      } catch (error) {
+        console.error("Error loading dashboard video preview:", error);
+        if (isMounted) {
+          setLatestVideo(null);
+          setLatestVideoLoadError(true);
+        }
+      } finally {
+        if (isMounted) setLoadingLatestVideo(false);
+      }
+    };
+
+    void fetchLatestVideo();
+    return () => {
+      isMounted = false;
+    };
+  }, [targetExam]);
 
   const fetchUserDocument = async (currentUser: any) => {
     if (!currentUser) return;
@@ -487,38 +584,98 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* 🎬 COACHING CLASSES TEASER BANNER (Just Above Cards / Below Stats) */}
-        <Link
-          href="/videos"
-          className="group relative mb-6 block overflow-hidden rounded-3xl border border-emerald-400/30 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-lg transition hover:border-emerald-400/60 hover:shadow-emerald-950/20 sm:p-6"
-        >
-          <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-emerald-500/20 blur-2xl"></div>
-
-          <div className="relative z-10 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="space-y-1.5 max-w-2xl">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-950 shadow-sm">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-600 opacity-75"></span>
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600"></span>
-                  </span>
-                  NEW LECTURES LIVE
-                </span>
-              </div>
-              <h3 className="flex items-center gap-2 text-base font-black leading-snug text-white sm:text-lg">
-                <Video size={18} className="text-blue-400" />
-                Top Coaching Video Classes &amp; Notes
-              </h3>
-              <p className="text-xs font-medium leading-relaxed text-slate-300">
-                Watch subject-wise shortcut tricks and concept lectures by top faculties.
-              </p>
-            </div>
-
-            <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-emerald-300/40 bg-emerald-400 px-4 py-2.5 text-xs font-black text-emerald-950 transition group-hover:bg-emerald-300 group-hover:shadow-lg group-hover:shadow-emerald-500/20">
-              Watch Classes Now <span aria-hidden="true">➔</span>
+        {/* 🎬 Latest coaching lecture preview */}
+        <section className="mb-6 overflow-hidden rounded-3xl border border-indigo-900/50 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-4 text-white shadow-xl sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+              </span>
+              LIVE CLASS
             </span>
+            {latestVideo && (
+              <span className="rounded-full border border-indigo-300/20 bg-indigo-400/15 px-2.5 py-1 text-[10px] font-bold text-indigo-100">
+                {latestVideo.exam} - {latestVideo.subject}
+              </span>
+            )}
           </div>
-        </Link>
+
+          <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-lg shadow-black/30">
+            {latestVideo && isLatestVideoPlaying ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${latestVideo.youtubeId}?autoplay=1`}
+                title={latestVideo.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="absolute inset-0 h-full w-full border-0"
+              />
+            ) : latestVideo ? (
+              <>
+                <img
+                  src={`https://img.youtube.com/vi/${latestVideo.youtubeId}/hqdefault.jpg`}
+                  alt={`${latestVideo.title} video thumbnail`}
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <span className="absolute inset-0 bg-slate-950/35" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => setIsLatestVideoPlaying(true)}
+                  aria-label={`Play class: ${latestVideo.title}`}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                  <span className="flex flex-col items-center gap-2 text-xs font-black text-white">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/80 bg-blue-600/90 shadow-[0_0_36px_rgba(59,130,246,0.85)] transition hover:scale-110 hover:bg-blue-500">
+                      <Play size={27} fill="currentColor" className="ml-1" />
+                    </span>
+                    Play Class
+                  </span>
+                </button>
+                <span className="pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-md bg-slate-950/85 px-2 py-1 text-[10px] font-bold text-white">
+                  <Clock size={12} /> {latestVideo.duration}
+                </span>
+              </>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
+                <p className="text-sm font-semibold text-slate-300">
+                  {loadingLatestVideo
+                    ? "Loading the latest class..."
+                    : latestVideoLoadError
+                      ? "Could not load the latest class. Please try again later."
+                      : "No coaching classes are available yet."}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {latestVideo ? (
+            <div className="mt-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-black leading-snug sm:text-lg">
+                  {latestVideo.title}
+                </h3>
+                <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-medium text-indigo-200">
+                  <Video size={14} className="shrink-0" />
+                  {latestVideo.faculty}
+                </p>
+              </div>
+              <Link
+                href="/videos"
+                className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20 sm:self-auto"
+              >
+                View All Coaching Classes <span aria-hidden="true">➔</span>
+              </Link>
+            </div>
+          ) : (
+            <Link
+              href="/videos"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20"
+            >
+              View All Coaching Classes <span aria-hidden="true">➔</span>
+            </Link>
+          )}
+        </section>
 
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">
