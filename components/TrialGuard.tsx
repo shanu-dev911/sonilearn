@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { auth, db } from "@/lib/firebase-client";
 import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -21,7 +22,7 @@ export default function TrialGuard({ children }: TrialGuardProps) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
-        router.push("/login");
+        router.replace("/login");
         return;
       }
 
@@ -30,7 +31,7 @@ export default function TrialGuard({ children }: TrialGuardProps) {
         const userSnap = await getDoc(userRef);
 
         if (!userSnap.exists()) {
-          router.push("/complete-profile");
+          router.replace("/complete-profile");
           return;
         }
 
@@ -71,18 +72,20 @@ export default function TrialGuard({ children }: TrialGuardProps) {
           <p className="text-slate-500 text-sm mb-6 leading-relaxed">
             Upgrade to Premium to continue accessing Daily Challenge, Warrior Questions, and all features.
           </p>
-          <button
-            onClick={() => router.push("/premium")}
+          <Link
+            href="/premium"
+            prefetch={true}
             className="w-full bg-slate-900 hover:bg-slate-800 text-white h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md"
           >
             <Zap size={16} /> Upgrade to Premium — ₹49
-          </button>
-          <button
-            onClick={() => router.push("/")}
+          </Link>
+          <Link
+            href="/"
+            prefetch={true}
             className="w-full mt-3 bg-slate-100 hover:bg-slate-200 text-slate-700 h-11 rounded-xl font-bold text-xs"
           >
             Go Back
-          </button>
+          </Link>
         </div>
       </div>
     );

@@ -2,346 +2,356 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase-client";
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, orderBy, getDocs } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { db } from "@/lib/firebase-client";
 import {
   ArrowLeft,
+  BookOpen,
+  ChevronDown,
+  Clock,
+  FileText,
   Play,
   Sparkles,
-  Clock,
   User,
-  BookOpen,
-  X,
-  FileText,
-  Lock,
-  Crown
 } from "lucide-react";
 
 interface VideoItem {
   id: string;
   title: string;
-  description?: string;
+  description: string;
   exam: string;
   subject: string;
   faculty: string;
-  duration?: string;
+  duration: string;
   youtubeId: string;
-  isLatest?: boolean;
+  isLatest: boolean;
+}
+
+function extractYoutubeId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+
+  const input = value.trim();
+  if (/^[\w-]{11}$/.test(input)) return input;
+
+  try {
+    const url = new URL(input.startsWith("http") ? input : `https://${input}`);
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (!["youtube.com", "m.youtube.com", "youtube-nocookie.com", "youtu.be"].includes(hostname)) {
+      return null;
+    }
+
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    const id =
+      hostname === "youtu.be"
+        ? pathParts[0]
+        : url.searchParams.get("v") ||
+          (["embed", "shorts", "live", "v"].includes(pathParts[0]) ? pathParts[1] : null);
+
+    return id && /^[\w-]{11}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function asText(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value.trim() || fallback : fallback;
 }
 
 export default function VideosPage() {
-  const router = useRouter();
-
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [selectedExam, setSelectedExam] = useState("ALL");
   const [selectedSubject, setSelectedSubject] = useState("ALL");
-  const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+  const [openNotesId, setOpenNotesId] = useState<string | null>(null);
 
-  // Firestore se published videos load karna
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push("/login");
-      }
-    });
+    let isMounted = true;
 
     const loadVideos = async () => {
       try {
         setLoading(true);
-        const q = query(collection(db, "videos"), orderBy("createdAt", "desc"));
-        const snap = await getDocs(q);
-        const list = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        })) as VideoItem[];
-        setVideos(list);
-      } catch (err) {
-        console.error("Error loading videos:", err);
+        setLoadError(false);
+        const videosQuery = query(collection(db, "videos"), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(videosQuery);
+        const loadedVideos = snapshot.docs.flatMap((document) => {
+          const data = document.data();
+          const youtubeId = extractYoutubeId(
+            data.youtubeId ?? data.youtubeUrl ?? data.videoUrl ?? data.url,
+          );
+
+          if (!youtubeId) return [];
+
+          return [{
+            id: document.id,
+            title: asText(data.title, "Untitled class"),
+            description: asText(data.notes ?? data.summary ?? data.description),
+            exam: asText(data.exam, "Exam prep"),
+            subject: asText(data.subject, "General"),
+            faculty: asText(data.faculty, "SoniLearn Faculty"),
+            duration: asText(data.duration, "Full lecture"),
+            youtubeId,
+            isLatest: data.isLatest === true,
+          }];
+        });
+
+        if (isMounted) setVideos(loadedVideos);
+      } catch (error) {
+        console.error("Error loading public video lectures:", error);
+        if (isMounted) setLoadError(true);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    loadVideos();
-    return () => unsub();
-  }, [router]);
+    void loadVideos();
+    return () => {
+      isMounted = false;
+    };
+  }, [retryCount]);
 
-  // Filters
-  const filteredVideos = videos.filter((v) => {
-    const matchExam = selectedExam === "ALL" || v.exam === selectedExam;
-    const matchSubject = selectedSubject === "ALL" || v.subject === selectedSubject;
-    return matchExam && matchSubject;
+  const examOptions = ["ALL", ...Array.from(new Set(videos.map((video) => video.exam)))];
+  const subjectOptions = ["ALL", ...Array.from(new Set(videos.map((video) => video.subject)))];
+  const filteredVideos = videos.filter((video) => {
+    const matchesExam = selectedExam === "ALL" || video.exam === selectedExam;
+    const matchesSubject = selectedSubject === "ALL" || video.subject === selectedSubject;
+    return matchesExam && matchesSubject;
   });
+  const featuredVideo = videos.find((video) => video.isLatest) ?? videos[0];
 
-  // Top Hero Video (agar koi 'isLatest' marked ho ya first video)
-  const heroVideo = videos.find((v) => v.isLatest) || videos[0];
+  const playVideo = (videoId: string) => setPlayingVideoId(videoId);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-24 font-sans">
-      
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/")}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 className="text-base font-black text-slate-900 leading-tight">
-              Coaching Video Classes 🎬
-            </h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              Concept & Trick Lectures
-            </p>
+    <div className="min-h-screen bg-slate-50 pb-16 font-sans text-slate-900">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              aria-label="Back to home"
+              className="rounded-xl bg-slate-100 p-2 text-slate-700 transition hover:bg-slate-200"
+            >
+              <ArrowLeft size={18} />
+            </Link>
+            <div>
+              <h1 className="text-base font-black leading-tight text-slate-900">
+                Coaching Video Classes
+              </h1>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Concept &amp; Trick Lectures
+              </p>
+            </div>
           </div>
-        </div>
-
-        <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black px-2.5 py-1 rounded-xl">
-          <Crown size={12} />
-          <span>Pass Included</span>
+          <span className="hidden rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-blue-700 sm:inline-flex">
+            Learn at your pace
+          </span>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 pt-5 space-y-6">
-
-        {/* 1. HERO FEATURED CLASS BANNER */}
-        {heroVideo && !loading && (
-          <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white rounded-3xl p-5 sm:p-7 shadow-xl border border-indigo-900/40">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                <Sparkles size={11} /> FEATURED CLASS
+      <main className="mx-auto max-w-6xl space-y-6 px-4 pt-6">
+        {featuredVideo && !loading && (
+          <section className="relative overflow-hidden rounded-3xl border border-indigo-900/40 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-5 text-white shadow-xl sm:p-7">
+            <div className="relative z-10 max-w-3xl">
+              <span className="mb-3 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-950">
+                <Sparkles size={12} /> Featured class
               </span>
-              <span className="text-[11px] font-bold text-indigo-200 bg-white/10 px-2 py-0.5 rounded-lg">
-                {heroVideo.exam} • {heroVideo.subject}
-              </span>
-            </div>
-
-            <h2 className="text-lg sm:text-2xl font-black text-white leading-snug mb-2">
-              {heroVideo.title}
-            </h2>
-
-            {heroVideo.description && (
-              <p className="text-xs text-slate-300 font-medium line-clamp-2 mb-5 max-w-2xl leading-relaxed">
-                {heroVideo.description}
+              <p className="mb-2 text-xs font-bold text-indigo-200">
+                {featuredVideo.exam} <span className="px-1">•</span> {featuredVideo.subject}
               </p>
-            )}
-
-            <div className="flex items-center justify-between pt-2 border-t border-white/10">
-              <div className="text-xs text-slate-300 font-semibold flex items-center gap-2">
-                <span>By {heroVideo.faculty}</span>
-                <span>•</span>
-                <span>{heroVideo.duration || "Class"}</span>
-              </div>
-
+              <h2 className="text-xl font-black leading-snug sm:text-2xl">{featuredVideo.title}</h2>
+              {featuredVideo.description && (
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-300">
+                  {featuredVideo.description}
+                </p>
+              )}
               <button
-                onClick={() => setActiveVideo(heroVideo)}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-lg active:scale-95 transition"
+                type="button"
+                onClick={() => playVideo(featuredVideo.id)}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-lg transition hover:bg-blue-500 active:scale-95"
               >
-                <Play size={13} fill="white" /> Watch Class
+                <Play size={14} fill="currentColor" /> Watch class
               </button>
+            </div>
+            <div aria-hidden="true" className="absolute -right-12 -top-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+          </section>
+        )}
+
+        {!loading && videos.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {examOptions.map((exam) => (
+                <button
+                  key={exam}
+                  type="button"
+                  onClick={() => {
+                    setSelectedExam(exam);
+                    setSelectedSubject("ALL");
+                  }}
+                  className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+                    selectedExam === exam
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {exam === "ALL" ? "All Exams" : exam}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {subjectOptions.map((subject) => (
+                <button
+                  key={subject}
+                  type="button"
+                  onClick={() => setSelectedSubject(subject)}
+                  className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-[11px] font-bold transition ${
+                    selectedSubject === subject
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {subject === "ALL" ? "All Subjects" : subject}
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {/* 2. FILTER TABS */}
-        <div className="space-y-2">
-          {/* Exam Filter */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {["ALL", "SSC GD", "Railway (NTPC/Group D)"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setSelectedExam(tab);
-                  setSelectedSubject("ALL");
-                }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
-                  selectedExam === tab
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {tab === "ALL" ? "All Exams" : tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Subject Filter */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {["ALL", "Maths", "Reasoning", "GK & GS", "General Science"].map((sub) => (
-              <button
-                key={sub}
-                onClick={() => setSelectedSubject(sub)}
-                className={`px-3 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
-                  selectedSubject === sub
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {sub === "ALL" ? "All Subjects" : sub}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 3. VIDEOS LIST GRID */}
         {loading ? (
-          <div className="text-center py-16">
-            <div className="w-9 h-9 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-xs text-slate-400 font-bold">Loading video lectures...</p>
+          <div className="py-16 text-center">
+            <div className="mx-auto mb-3 h-9 w-9 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            <p className="text-xs font-bold text-slate-500">Loading video lectures...</p>
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="rounded-3xl border border-rose-200 bg-white p-10 text-center">
+            <h3 className="text-sm font-black text-slate-800">Lectures couldn&apos;t be loaded</h3>
+            <p className="mt-1 text-xs text-slate-500">Please check your connection and try again.</p>
+            <button
+              type="button"
+              onClick={() => setRetryCount((count) => count + 1)}
+              className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500"
+            >
+              Try again
+            </button>
           </div>
         ) : filteredVideos.length === 0 ? (
-          <div className="bg-white rounded-3xl p-10 text-center border border-slate-200">
-            <BookOpen size={36} className="mx-auto text-slate-300 mb-2" />
-            <h3 className="text-sm font-black text-slate-800">No Lectures Found</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Is filter ke liye abhi koi lecture upload nahi hua hai.
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center">
+            <BookOpen size={36} className="mx-auto mb-2 text-slate-300" />
+            <h3 className="text-sm font-black text-slate-800">No lectures found</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {videos.length
+                ? "There are no lectures for these filters."
+                : "New lectures will appear here as soon as they are published."}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredVideos.map((vid) => (
-              <div
-                key={vid.id}
-                onClick={() => setActiveVideo(vid)}
-                className="bg-white border border-slate-200 hover:border-blue-500 rounded-3xl p-4 shadow-xs hover:shadow-md transition cursor-pointer flex flex-col justify-between group"
-              >
-                <div>
-                  {/* Thumbnail / Placeholder */}
-                  <div className="relative aspect-video rounded-2xl bg-slate-900 overflow-hidden mb-3 flex items-center justify-center">
-                    <img
-                      src={`https://img.youtube.com/vi/${vid.youtubeId}/hqdefault.jpg`}
-                      alt={vid.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = "none";
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition flex items-center justify-center">
-                      <div className="w-10 h-10 rounded-full bg-white/90 text-blue-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition">
-                        <Play size={18} fill="#2563eb" className="ml-0.5" />
-                      </div>
-                    </div>
-                    {vid.duration && (
-                      <span className="absolute bottom-2 right-2 bg-slate-950/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-                        {vid.duration}
-                      </span>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredVideos.map((video) => {
+              const isPlaying = playingVideoId === video.id;
+              const notesOpen = openNotesId === video.id;
+
+              return (
+                <article
+                  key={video.id}
+                  onClick={(event) => {
+                    const target = event.target;
+                    if (target instanceof Element && target.closest("button, iframe, a")) return;
+                    playVideo(video.id);
+                  }}
+                  className="group flex cursor-pointer flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg"
+                >
+                  <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-950">
+                    {isPlaying ? (
+                      <iframe
+                        src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1`}
+                        title={video.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        className="absolute inset-0 h-full w-full border-0"
+                      />
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          aria-label={`Play ${video.title}`}
+                          onClick={() => playVideo(video.id)}
+                          className="absolute inset-0 z-10 flex h-full w-full items-center justify-center"
+                        >
+                          <img
+                            src={`https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`}
+                            alt=""
+                            loading="lazy"
+                            className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                          <span className="absolute inset-0 bg-slate-950/35 transition group-hover:bg-slate-950/20" />
+                          <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-white/70 bg-blue-600/90 text-white shadow-[0_0_30px_rgba(59,130,246,0.8)] transition group-hover:scale-110">
+                            <Play size={22} fill="currentColor" className="ml-1" />
+                          </span>
+                        </button>
+                        <span className="pointer-events-none absolute bottom-2 right-2 z-20 inline-flex items-center gap-1 rounded-md bg-slate-950/85 px-2 py-1 text-[10px] font-bold text-white">
+                          <Clock size={11} /> {video.duration}
+                        </span>
+                      </>
                     )}
                   </div>
 
-                  {/* Badges */}
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase">
-                      {vid.exam}
+                  <button
+                    type="button"
+                    onClick={() => playVideo(video.id)}
+                    className="mt-3 flex flex-1 flex-col text-left"
+                  >
+                    <span className="mb-2 flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-md bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-blue-700">
+                        {video.exam}
+                      </span>
+                      <span className="rounded-md bg-indigo-50 px-2 py-1 text-[9px] font-bold text-indigo-700">
+                        {video.subject}
+                      </span>
                     </span>
-                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                      {vid.subject}
+                    <span className="line-clamp-2 text-sm font-black leading-snug text-slate-900">
+                      {video.title}
                     </span>
+                    <span className="mt-2 flex items-center gap-1.5 truncate text-[11px] font-semibold text-slate-500">
+                      <User size={13} className="shrink-0" />
+                      {video.faculty}
+                    </span>
+                  </button>
+
+                  <div className="mt-3 border-t border-slate-100 pt-2">
+                    <button
+                      type="button"
+                      aria-expanded={notesOpen}
+                      onClick={() => setOpenNotesId(notesOpen ? null : video.id)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg py-1.5 text-left text-[11px] font-bold text-indigo-700 transition hover:text-indigo-900"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <FileText size={14} />
+                        View Class Notes &amp; Summary
+                      </span>
+                      <ChevronDown
+                        size={15}
+                        className={`shrink-0 transition-transform ${notesOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {notesOpen && (
+                      <div className="mt-1 rounded-xl bg-indigo-50/80 p-3 text-xs leading-relaxed text-slate-700">
+                        {video.description ? (
+                          <p className="whitespace-pre-wrap">{video.description}</p>
+                        ) : (
+                          <p className="text-slate-500">Notes haven&apos;t been added for this class yet.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  <h3 className="text-sm font-black text-slate-900 line-clamp-2 leading-snug">
-                    {vid.title}
-                  </h3>
-
-                  {vid.description && (
-                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
-                      {vid.description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
-                  <span className="flex items-center gap-1 truncate">
-                    <User size={12} /> {vid.faculty}
-                  </span>
-                  <span className="text-blue-600 font-bold group-hover:underline">
-                    Watch →
-                  </span>
-                </div>
-              </div>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
-
       </main>
-
-      {/* 4. VIDEO PLAYER + NOTES MODAL */}
-      {activeVideo && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-          <div className="bg-white rounded-3xl overflow-hidden max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh]">
-            
-            {/* Modal Header */}
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-              <div className="min-w-0 pr-3">
-                <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">
-                  {activeVideo.exam} • {activeVideo.subject}
-                </span>
-                <h3 className="text-sm font-bold truncate mt-1 text-white">
-                  {activeVideo.title}
-                </h3>
-              </div>
-              <button
-                onClick={() => setActiveVideo(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center shrink-0"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* YouTube Embed Player */}
-            <div className="relative aspect-video bg-black">
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${activeVideo.youtubeId}?autoplay=1&rel=0`}
-                title={activeVideo.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full border-0"
-              ></iframe>
-            </div>
-
-            {/* Class Details & Notes */}
-            <div className="p-5 overflow-y-auto space-y-4">
-              <div>
-                <h4 className="text-base font-black text-slate-900 leading-tight">
-                  {activeVideo.title}
-                </h4>
-                <p className="text-xs text-slate-500 font-semibold mt-1">
-                  Faculty: <strong className="text-slate-800">{activeVideo.faculty}</strong> • Duration: {activeVideo.duration || "Full Lecture"}
-                </p>
-              </div>
-
-              {/* Class Notes Section */}
-              {activeVideo.description && (
-                <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900 uppercase tracking-wider mb-2">
-                    <FileText size={14} className="text-indigo-600" />
-                    Teacher Notes & Summary
-                  </div>
-                  <div className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">
-                    {activeVideo.description}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => setActiveVideo(null)}
-                className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800"
-              >
-                Close Video
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

@@ -488,36 +488,37 @@ export default function Dashboard() {
         </div>
 
         {/* 🎬 COACHING CLASSES TEASER BANNER (Just Above Cards / Below Stats) */}
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-3xl p-5 sm:p-6 text-white shadow-lg relative overflow-hidden mb-6">
-          <div className="absolute -right-8 -top-8 w-28 h-28 bg-blue-600/20 rounded-full blur-2xl pointer-events-none"></div>
+        <Link
+          href="/videos"
+          className="group relative mb-6 block overflow-hidden rounded-3xl border border-emerald-400/30 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-lg transition hover:border-emerald-400/60 hover:shadow-emerald-950/20 sm:p-6"
+        >
+          <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-emerald-500/20 blur-2xl"></div>
 
-          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="relative z-10 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="space-y-1.5 max-w-2xl">
               <div className="flex items-center gap-2">
-                <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                  🚀 LAUNCHING SOON
-                </span>
-                <span className="text-[11px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-500/30 px-2 py-0.5 rounded-lg">
-                  SSC & Railway Batch
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-950 shadow-sm">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-600 opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600"></span>
+                  </span>
+                  NEW LECTURES LIVE
                 </span>
               </div>
-              <h3 className="text-base sm:text-lg font-black leading-snug text-white flex items-center gap-2">
+              <h3 className="flex items-center gap-2 text-base font-black leading-snug text-white sm:text-lg">
                 <Video size={18} className="text-blue-400" />
-                Online Coaching Concept Classes
+                Top Coaching Video Classes &amp; Notes
               </h3>
-              <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                Top Faculty ke Subject-wise lectures, tricky short tricks aur previous year video solutions jald live honge. Included in all paid passes!
+              <p className="text-xs font-medium leading-relaxed text-slate-300">
+                Watch subject-wise shortcut tricks and concept lectures by top faculties.
               </p>
             </div>
 
-            <button
-              onClick={() => alert("Classes ki shooting aur editing chal rahi hai. Next update me batches live ho jayenge! 🚀")}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold transition-all border border-white/15 whitespace-nowrap shrink-0"
-            >
-              Notify Me 🔔
-            </button>
+            <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-emerald-300/40 bg-emerald-400 px-4 py-2.5 text-xs font-black text-emerald-950 transition group-hover:bg-emerald-300 group-hover:shadow-lg group-hover:shadow-emerald-500/20">
+              Watch Classes Now <span aria-hidden="true">➔</span>
+            </span>
           </div>
-        </div>
+        </Link>
 
         {/* COMPACT INTERACTIVE DASHBOARD CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6">

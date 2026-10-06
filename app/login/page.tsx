@@ -27,6 +27,58 @@ import { FiMail, FiLock } from "react-icons/fi";
 import { Eye, EyeOff } from "lucide-react";
 
 const googleProvider = new GoogleAuthProvider();
+const REDIRECT_STORAGE_KEY = "postLoginRedirect";
+
+function getSafeRedirectPath(value: string | null): string | null {
+    if (!value || typeof window === "undefined") return null;
+
+    try {
+        const destination = new URL(value, window.location.origin);
+        if (
+            destination.origin !== window.location.origin ||
+            destination.pathname === "/login" ||
+            destination.pathname.startsWith("/login/")
+        ) {
+            return null;
+        }
+
+        return `${destination.pathname}${destination.search}${destination.hash}`;
+    } catch {
+        return null;
+    }
+}
+
+function getPostLoginDestination(): string {
+    const queryRedirect = new URLSearchParams(window.location.search).get("redirect");
+    let storedRedirect: string | null = null;
+
+    try {
+        storedRedirect = sessionStorage.getItem(REDIRECT_STORAGE_KEY);
+        sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
+    } catch (error) {
+        console.error("Could not restore post-login redirect:", error);
+    }
+
+    return (
+        getSafeRedirectPath(queryRedirect) ??
+        getSafeRedirectPath(storedRedirect) ??
+        "/"
+    );
+}
+
+function preserveRedirectForGoogleSignIn(): void {
+    const redirect = getSafeRedirectPath(
+        new URLSearchParams(window.location.search).get("redirect"),
+    );
+
+    if (redirect) {
+        try {
+            sessionStorage.setItem(REDIRECT_STORAGE_KEY, redirect);
+        } catch (error) {
+            console.error("Could not preserve post-login redirect:", error);
+        }
+    }
+}
 
 function isInAppBrowser(): boolean {
     if (typeof window === "undefined") return false;
@@ -51,7 +103,7 @@ export default function LoginPage() {
             if (userSnap.exists()) {
                 const userData = userSnap.data();
                 if (userData.profileCompleted) {
-                    router.push("/");
+                    router.push(getPostLoginDestination());
                 } else {
                     router.push("/complete-profile");
                 }
@@ -118,6 +170,7 @@ export default function LoginPage() {
             setLoading(true);
 
             if (isInAppBrowser()) {
+                preserveRedirectForGoogleSignIn();
                 await signInWithRedirect(auth, googleProvider);
                 return;
             }
@@ -133,6 +186,7 @@ export default function LoginPage() {
                 error.code === "auth/popup-closed-by-user"
             ) {
                 try {
+                    preserveRedirectForGoogleSignIn();
                     await signInWithRedirect(auth, googleProvider);
                     return;
                 } catch (redirectError) {
